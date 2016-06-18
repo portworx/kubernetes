@@ -748,7 +748,7 @@ type VsphereVirtualDiskVolumeSource struct {
 }
 
 // Represents a Portworx volume resource.
-type PwxVolumeSource struct {
+type PWXVolumeSource struct {
 	// VolumeID is the id of the volume
 	VolumeID string `json:"volumeID"`
 	// Filesystem type to mount
