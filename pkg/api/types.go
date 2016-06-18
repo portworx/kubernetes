@@ -233,6 +233,8 @@ type VolumeSource struct {
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
+	// PwxVolume represents a portworx volume attached and mounted on kubelets host machine
+	PWXVolume *PWXVolumeSource `json:"pwxVolume,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -273,6 +275,9 @@ type PersistentVolumeSource struct {
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
+	// PWXVolume represents a portworx volume attached and mounted on kubelets host machine
+	PWXVolume *PWXVolumeSource `json:"pwxVolume,omitempty"`
+
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -739,6 +744,18 @@ type VsphereVirtualDiskVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType string `json:"fsType,omitempty"`
+}
+
+// Represents a Portworx volume resource.
+type PwxVolumeSource struct {
+	// VolumeID is the id of the volume
+	VolumeID string `json:"volumeID"`
+	// Filesystem type to mount
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType string `json:"fsType,omitempty"`
+	// Options
+	Options map[string][string] `json: "options,omitempty"`
 }
 
 // Adapts a ConfigMap into a volume.
