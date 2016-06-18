@@ -61,8 +61,17 @@ func (plugin *pwxVolumePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *pwxVolumePlugin) Name() string {
+func (plugin *pwxVolumePlugin) GetPluginName() string {
 	return pwxVolumePluginName
+}
+
+func (plugin *pwxVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return volumeSource.VolumeID, nil
 }
 
 func (plugin *pwxVolumePlugin) CanSupport(spec *volume.Spec) bool {
@@ -82,15 +91,10 @@ func (plugin *pwxVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ vol
 	return plugin.newMounterInternal(spec, pod.UID, &PWXDiskUtil{}, plugin.host.GetMounter())
 }
 
-func (plugin *pwxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Mounter, error) {
-	var readOnly bool
-	var pwx *api.PWXVolumeSource
-	if spec.Volume != nil && spec.Volume.PWXVolume != nil {
-		pwx = spec.Volume.PWXVolume
-		readOnly = ebs.ReadOnly
-	} else {
-		pwx = spec.PersistentVolume.Spec.PWXVolume
-		readOnly = spec.ReadOnly
+func (plugin *pwxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager pwxManager, mounter mount.Interface) (volume.Mounter, error) {
+	pwx, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
 
 	volumeID := pwx.VolumeID
@@ -102,6 +106,7 @@ func (plugin *pwxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID type
 			podUID:          podUID,
 			volName:         spec.Name(),
 			volumeID:        volumeID,
+			partition:       partition,
 			manager:         manager,
 			mounter:         mounter,
 			plugin:          plugin,
@@ -116,7 +121,7 @@ func (plugin *pwxVolumePlugin) NewUnmounter(volName string, podUID types.UID) (v
 	return plugin.newUnmounterInternal(volName, podUID, &PWXDiskUtil{}, plugin.host.GetMounter())
 }
 
-func (plugin *pwxVolumePlugin) newUnmounterInternal(volName string, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Unmounter, error) {
+func (plugin *pwxVolumePlugin) newUnmounterInternal(volName string, podUID types.UID, manager pwxManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &pwxVolumeUnmounter{
 		&pwxVolume{
 			podUID:          podUID,
@@ -162,41 +167,39 @@ func (plugin *pwxVolumePlugin) newProvisionerInternal(options volume.VolumeOptio
 	}, nil
 }
 
+func getVolumeSource(
+	spec *volume.Spec) (*api.PWXVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.PWXVolumeSource != nil {
+		return spec.Volume.PWXVolume, spec.Volume.PWXVolume.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.PWXVolume != nil {
+		return spec.PersistentVolume.Spec.PWXVolume, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference a PWX volume type")
+}
+
 // Abstract interface to PD operations.
 type pwxManager interface {
-	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(b *pwxVolumeMounter, globalPDPath string) error
-	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(c *pwxVolumeUnmounter) error
 	// Creates a volume
 	CreateVolume(provisioner *pwxVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *pwxVolumeDeleter) error
 }
 
-// pwxVolume volumes are disk resources
+// pwxVolume volumes are pwx block devices
 // that are attached to the kubelet's host machine and exposed to the pod.
 type pwxVolume struct {
 	volName string
 	podUID  types.UID
 	// Unique id of the PD, used to find the disk resource in the provider.
 	volumeID string
-	//diskID for detach disk
-	diskID string
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager pwxManager
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
-
-	plugin *pwxVolumePlugin
+	plugin  *pwxVolumePlugin
 	volume.MetricsProvider
-}
-
-func detachDiskLogError(pwx *pwxVolume) {
-	err := pwx.manager.DetachDisk(&pwxVolumeUnmounter{pwx})
-	if err != nil {
-		glog.Warningf("Failed to detach disk: %v (%v)", pwx, err)
-	}
 }
 
 type pwxVolumeMounter struct {
@@ -213,8 +216,9 @@ var _ volume.Mounter = &pwxVolumeMounter{}
 
 func (b *pwxVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         !b.readOnly,
+		ReadOnly: b.readOnly,
+		Managed:  !b.readOnly,
+		// true ?
 		SupportsSELinux: true,
 	}
 }
@@ -238,16 +242,10 @@ func (b *pwxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	globalPDPath := makeGlobalPDPath(b.plugin.host, b.volumeID)
-	if err := b.manager.AttachDisk(b, globalPDPath); err != nil {
-		glog.V(4).Infof("AttachDisk failed: %v", err)
-		return err
-	}
 
 	glog.V(3).Infof("pwx volume %s attached", b.volPath)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		// TODO: we should really eject the attach/detach out into its own control loop.
-		detachDiskLogError(b.pwxVolume)
 		return err
 	}
 
@@ -280,7 +278,6 @@ func (b *pwxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 			}
 		}
 		os.Remove(dir)
-		detachDiskLogError(b.pwxVolume)
 		return err
 	}
 
@@ -346,34 +343,10 @@ func (c *pwxVolumeUnmounter) TearDownAt(dir string) error {
 		return os.Remove(dir)
 	}
 
-	refs, err := mount.GetMountRefs(c.mounter, dir)
-	if err != nil {
-		glog.V(2).Info("Error getting mountrefs for ", dir, ": ", err)
-		return err
-	}
-	if len(refs) == 0 {
-		glog.Warning("Did not find pod-mount for ", dir, " during tear-down")
-	}
 	// Unmount the bind-mount inside this pod
 	if err := c.mounter.Unmount(dir); err != nil {
 		glog.V(2).Info("Error unmounting dir ", dir, ": ", err)
 		return err
-	}
-	// If len(refs) is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if len(refs) == 1 {
-		// c.volumeID is not initially set for volume-unmounters, so set it here.
-		c.volumeID, err = getVolumeIDFromGlobalMount(c.plugin.host, refs[0])
-		if err != nil {
-			glog.V(2).Info("Could not determine volumeID from mountpoint ", refs[0], ": ", err)
-			return err
-		}
-		if err := c.manager.DetachDisk(&pwxVolumeUnmounter{c.pwxVolume}); err != nil {
-			glog.V(2).Info("Error detaching disk ", c.volumeID, ": ", err)
-			return err
-		}
-	} else {
-		glog.V(2).Infof("Found multiple refs; won't detach EBS volume: %v", refs)
 	}
 	notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
