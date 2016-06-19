@@ -26,7 +26,11 @@ import (
 	osdvolume "github.com/libopenstorage/openstorage/api/client/volume"
 )
 
-const ProviderName = "portworx"
+const (
+	ProviderName = "portworx"
+	localHostName = "http://0.0.0.0"
+)
+
 
 type PWXCloud struct {
 	cfg *PWXConfig
@@ -90,6 +94,8 @@ func (pc *PWXCloud) newOsdClient(hostName string) (*osdvolume.VolumeDriver, erro
 	var clientUrl string
 	if !strings.HasPrefix(hostName, "http://") {
 		clientUrl = "http://" + hostName + ":" + pc.MgmtPort
+	} else {
+		clientUrl = hostName + ":" + pc.MgmtPort
 	}
 
 	client, err := osdclient.NewClient(clientUrl, pc.DriverVersion)
@@ -158,4 +164,34 @@ func (px *PWXCloud) DetachVolume(volumeID string, hostName string) (string, erro
 	}
 	devicePath := "/dev/pxd/pxd" + volumeID
 	return devicePath, err
+}
+
+func (px *PWXCloud) MountVolume(volumeID string, mountPath string) error {
+	client, err := newOsdClient(localHostName)
+	if err != nil {
+		return "", err
+	}
+
+	err = client.Mount(volumeID, mountPath)
+	if err != nil {
+		glog.V(2).Infof("MountVolume on %v failed with error %v", volumeID, err)
+		return "", err
+	}
+
+	return err
+}
+
+func (px *PWXCloud) UnmountVolume(volumeID string, mountPath string) error {
+	client, err := newOsdClient(localHostName)
+	if err != nil {
+		return "", err
+	}
+
+	err = client.Unmount(volumeID, mountPath)
+	if err != nil {
+		glog.V(2).Infof("MountVolume on %v failed with error %v", volumeID, err)
+		return "", err
+	}
+
+	return err
 }
