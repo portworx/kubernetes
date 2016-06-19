@@ -754,8 +754,17 @@ type PWXVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType string `json:"fsType,omitempty"`
-	// Options
-	Options map[string][string] `json: "options,omitempty"`
+	// Specifies the number of nodes that are
+	// allowed to fail, and yet data is available
+	// A value of 0 implies that data is not erasure coded,
+	// a failure of a node will lead to data loss
+	HaLevel int64 `json:"ha_level,omitempty"`
+	// Block size for filesystem
+	BlockSize int64 `json:"block_size,omitempty"`
+	// Shared is true is this volume can be remotely accessed.
+	Shared bool `json:"shared,omitempty"`
+	// VolumeLabels
+	VolumeLabels map[string][string] `json: "volumeLabels,omitempty"`
 }
 
 // Adapts a ConfigMap into a volume.

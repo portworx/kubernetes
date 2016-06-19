@@ -91,6 +91,42 @@ func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map
 	return name, requestBytes, labels, nil
 }
 
+// Returns list of all paths for given PWX volume mount
+func getDiskByIdPaths(partition string, devicePath string) []string {
+	devicePaths := []string{}
+	if devicePath != "" {
+		devicePaths = append(devicePaths, devicePath)
+	}
+
+	return devicePaths
+}
+
+// Returns the first path that exists, or empty string if none exist.
+func verifyDevicePath(devicePaths []string) (string, error) {
+	for _, path := range devicePaths {
+		if pathExists, err := pathExists(path); err != nil {
+			return "", fmt.Errorf("Error checking if path exists: %v", err)
+		} else if pathExists {
+			return path, nil
+		}
+	}
+
+	return "", nil
+}
+
+// Checks if the specified path exists
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
+
 // Return cloud provider
 func getCloudProvider(plugin *pwxVolumePlugin) (*pwx.PWXCloud, error) {
 	if plugin == nil {

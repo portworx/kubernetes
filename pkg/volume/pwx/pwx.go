@@ -106,7 +106,6 @@ func (plugin *pwxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID type
 			podUID:          podUID,
 			volName:         spec.Name(),
 			volumeID:        volumeID,
-			partition:       partition,
 			manager:         manager,
 			mounter:         mounter,
 			plugin:          plugin,
@@ -407,7 +406,6 @@ func (c *pwxVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				PWXVolume: &api.PWXVolumeSource{
 					VolumeID:  volumeID,
-					FSType:    "ext4",
 					Partition: 0,
 					ReadOnly:  false,
 				},
