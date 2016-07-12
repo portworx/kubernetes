@@ -20,13 +20,15 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+)
+
+const (
+	checkSleepDuration  = time.Second
+	errorSleepDuration  = 5 * time.Second
 )
 
 type pwxVolumeAttacher struct {
@@ -52,20 +54,6 @@ func (attacher *pwxVolumeAttacher) Attach(spec *volume.Spec, hostName string) er
 	pwxCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
 	if err != nil {
 		return err
-	}
-
-	attached, err := pwxCloud.VolumeIsAttached(volumeID, hostName)
-	if err != nil {
-		// Log error and continue with attach
-		glog.Errorf(
-			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try attach anyway. err=%v",
-			volumeID, hostName, err)
-	}
-
-	if err == nil && attached {
-		// Volume is already attached to node.
-		glog.Infof("Attach operation is successful. volume %q is already attached to node %q.", volumeID, hostName)
-		return nil
 	}
 
 	if _, err = pwxCloud.AttachVolume(volumeID, hostName); err != nil {
@@ -112,9 +100,7 @@ func (attacher *pwxVolumeAttacher) WaitForAttach(spec *volume.Spec, timeout time
 				}
 			}
 			if devicePath != "" {
-				// Do we need this ??
-				devicePaths := getDiskByIdPaths(partition, devicePath)
-				path, err := verifyDevicePath(devicePaths)
+				path, err := verifyDevicePath(devicePath)
 				if err != nil {
 					// Log error, if any, and continue checking periodically. See issue #11321
 					glog.Errorf("Error verifying PWX Volume (%q) is attached: %v", volumeID, err)
@@ -147,7 +133,7 @@ func (attacher *pwxVolumeAttacher) MountDevice(spec *volume.Spec, volumeID strin
 
 	pwxCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	mounter := attacher.host.GetMounter()
@@ -163,7 +149,7 @@ func (attacher *pwxVolumeAttacher) MountDevice(spec *volume.Spec, volumeID strin
 		}
 	}
 
-	volumeSource, readOnly, err := getVolumeSource(spec)
+	_, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return err
 	}
@@ -199,19 +185,6 @@ func (detacher *pwxVolumeDetacher) Detach(deviceMountPath string, hostName strin
 	if err != nil {
 		return err
 	}
-	attached, err := pwxCloud.DiskIsAttached(volumeID, hostName)
-	if err != nil {
-		// Log error and continue with detach
-		glog.Errorf(
-			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try detach anyway. err=%v",
-			volumeID, hostName, err)
-	}
-
-	if err == nil && !attached {
-		// Volume is already detached from node.
-		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volumeID, hostName)
-		return nil
-	}
 
 	if _, err = pwxCloud.DetachVolume(volumeID, hostName); err != nil {
 		glog.Errorf("Error detaching volumeID %q: %v", volumeID, err)
@@ -244,7 +217,7 @@ func (detacher *pwxVolumeDetacher) WaitForDetach(devicePath string, timeout time
 
 func (detacher *pwxVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 	volumeID := path.Base(deviceMountPath)
-	pwxCloud, err := pwxCloud.getCloudProvider(detacher.host.GetCloudProvider())
+	pwxCloud, err := getCloudProvider(detacher.host.GetCloudProvider())
 	if err != nil {
 		return err
 	}
