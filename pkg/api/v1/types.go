@@ -874,7 +874,7 @@ type PWXVolumeSource struct {
 	// Shared is true is this volume can be remotely accessed.
 	Shared bool `json:"shared,omitempty" protobuf:"varint,5,opt,name=shared"`
 	// VolumeLabels
-	VolumeLabels map[string]string `protobuf:"bytes,6,rep,name=volumeLabels"`
+	VolumeLabels map[string]string `json:"volumeLabels,omitempty" protobuf:"bytes,6,rep,name=volumeLabels"`
 }
 
 // Adapts a ConfigMap into a volume.
