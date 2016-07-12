@@ -186,6 +186,14 @@ type pwxManager interface {
 	CreateVolume(provisioner *pwxVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *pwxVolumeDeleter) error
+	// Attach a volume
+	AttachVolume(mounter *pwxVolumeMounter) (string, error)
+	// Detach a volume
+	DetachVolume(unmounter *pwxVolumeUnmounter) error
+	// Mount a volume
+	MountVolume(mounter *pwxVolumeMounter, mountDir string) error
+	// Unmount a volume
+	UnmountVolume(unmounter *pwxVolumeUnmounter, mountDir string) error
 }
 
 // pwxVolume volumes are pwx block devices
@@ -236,26 +244,30 @@ func (b *pwxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("PWX volume set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
+		glog.Errorf("Cannot validate mountpoint: %s", dir)
 		return err
 	}
 	if !notMnt {
 		return nil
 	}
 
-	globalPDPath := makeGlobalPDPath(b.plugin.host, b.volumeID)
+	//globalPDPath := makeGlobalPDPath(b.plugin.host, b.volumeID)
+	if _, err := b.manager.AttachVolume(b); err != nil {
+		return err
+	}
 
-	glog.V(3).Infof("pwx volume %s attached", b.volumeID)
+	glog.V(3).Infof("PWX volume %s attached", b.volumeID)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return err
 	}
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	options := []string{"bind"}
-	if b.readOnly {
-		options = append(options, "ro")
+	if err := b.manager.MountVolume(b, dir); err != nil {
+		return err
 	}
-	err = b.mounter.Mount(globalPDPath, dir, "", options)
+
+	/*err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
@@ -284,7 +296,7 @@ func (b *pwxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	if !b.readOnly {
 		volume.SetVolumeOwnership(b, fsGroup)
-	}
+	}*/
 
 	return nil
 }
@@ -345,11 +357,14 @@ func (c *pwxVolumeUnmounter) TearDownAt(dir string) error {
 	}
 
 	// Unmount the bind-mount inside this pod
-	if err := c.mounter.Unmount(dir); err != nil {
-		glog.V(2).Info("Error unmounting dir ", dir, ": ", err)
+	if err := c.manager.UnmountVolume(c, dir); err != nil {
 		return err
 	}
-	notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
+
+	if err := c.manager.DetachVolume(c); err != nil {
+		return err
+	}
+	/*notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
 		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 		return err
@@ -359,7 +374,7 @@ func (c *pwxVolumeUnmounter) TearDownAt(dir string) error {
 			glog.V(2).Info("Error removing mountpoint ", dir, ": ", err)
 			return err
 		}
-	}
+	}*/
 	return nil
 }
 
