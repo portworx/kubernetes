@@ -19,21 +19,17 @@ package pwx
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"time"
 
-	"github.com/golang/glog"
+	//"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/pwx"
-	"k8s.io/kubernetes/pkg/util/keymutex"
-	"k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/volume"
+	//"k8s.io/kubernetes/pkg/volume"
 )
 
 type PWXDiskUtil struct{}
 
 func (util *PWXDiskUtil) DeleteVolume(d *pwxVolumeDeleter) error {
-	cloud, err := getCloudProvider(d.pwxVolume.plugin)
+	/*cloud, err := getCloudProvider(d.pwxVolume.plugin.host.GetCloudProvider())
 	if err != nil {
 		return err
 	}
@@ -47,14 +43,14 @@ func (util *PWXDiskUtil) DeleteVolume(d *pwxVolumeDeleter) error {
 		glog.V(2).Infof("Successfully deleted PWX volume %s", d.volumeID)
 	} else {
 		glog.V(2).Infof("Successfully deleted PWX volume %s (actually already deleted)", d.volumeID)
-	}
+	}*/
 	return nil
 }
 
 // CreateVolume creates an AWS EBS volume.
 // Returns: volumeID, volumeSize, labels, error
 func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map[string]string, error) {
-	cloud, err := getCloudProvider(p.pwxVolume.plugin)
+	/*cloud, err := getCloudProvider(p.pwxVolume.plugin.host.GetCloudProvider())
 	if err != nil {
 		return "", 0, nil, err
 	}
@@ -82,13 +78,14 @@ func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map
 	}
 	glog.V(2).Infof("Successfully created PWX volume %s", name)
 
-	labels, err := cloud.GetVolumeLabels(name)
+	labels, err = cloud.GetVolumeLabels(name)
 	if err != nil {
 		// We don't really want to leak the volume here...
 		glog.Errorf("error building labels for new PWXx volume %q: %v", name, err)
 	}
 
-	return name, requestBytes, labels, nil
+	return name, requestBytes, labels, nil*/
+	return "", 0, nil, nil
 }
 
 // Returns list of all paths for given PWX volume mount
@@ -102,15 +99,13 @@ func getDiskByIdPaths(partition string, devicePath string) []string {
 }
 
 // Returns the first path that exists, or empty string if none exist.
-func verifyDevicePath(devicePaths []string) (string, error) {
-	for _, path := range devicePaths {
-		if pathExists, err := pathExists(path); err != nil {
-			return "", fmt.Errorf("Error checking if path exists: %v", err)
-		} else if pathExists {
-			return path, nil
-		}
+func verifyDevicePath(devicePath string) (string, error) {
+	if pathExists, err := pathExists(devicePath); err != nil {
+		return "", fmt.Errorf("Error checking if path exists: %v", err)
+	} else if pathExists {
+		return devicePath, nil
 	}
-
+	
 	return "", nil
 }
 
@@ -128,17 +123,9 @@ func pathExists(path string) (bool, error) {
 
 
 // Return cloud provider
-func getCloudProvider(plugin *pwxVolumePlugin) (*pwx.PWXCloud, error) {
-	if plugin == nil {
-		return nil, fmt.Errorf("Failed to get PWX Cloud Provider. plugin object is nil.")
-	}
-	if plugin.host == nil {
-		return nil, fmt.Errorf("Failed to get PWX Cloud Provider. plugin.host object is nil.")
-	}
-
-	cloudProvider := plugin.host.GetCloudProvider()
+func getCloudProvider(cloudProvider cloudprovider.Interface) (*pwx.PWXCloud, error) {
 	pwxCloudProvider, ok := cloudProvider.(*pwx.PWXCloud)
-	if !ok || awsCloudProvider == nil {
+	if !ok || pwxCloudProvider == nil {
 		return nil, fmt.Errorf("Failed to get PWX Cloud Provider. plugin.host.GetCloudProvider returned %v instead", cloudProvider)
 	}
 

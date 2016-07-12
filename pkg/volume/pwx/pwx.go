@@ -21,7 +21,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -79,6 +78,10 @@ func (plugin *pwxVolumePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.PWXVolume != nil)
 }
 
+func (plugin *pwxVolumePlugin) RequiresRemount() bool {
+	return false
+}
+
 func (plugin *pwxVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
@@ -99,7 +102,6 @@ func (plugin *pwxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID type
 
 	volumeID := pwx.VolumeID
 	fsType := pwx.FSType
-	partition := ""
 
 	return &pwxVolumeMounter{
 		pwxVolume: &pwxVolume{
@@ -168,8 +170,8 @@ func (plugin *pwxVolumePlugin) newProvisionerInternal(options volume.VolumeOptio
 
 func getVolumeSource(
 	spec *volume.Spec) (*api.PWXVolumeSource, bool, error) {
-	if spec.Volume != nil && spec.Volume.PWXVolumeSource != nil {
-		return spec.Volume.PWXVolume, spec.Volume.PWXVolume.ReadOnly, nil
+	if spec.Volume != nil && spec.Volume.PWXVolume != nil {
+		return spec.Volume.PWXVolume, spec.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.PWXVolume != nil {
 		return spec.PersistentVolume.Spec.PWXVolume, spec.ReadOnly, nil
@@ -230,9 +232,9 @@ func (b *pwxVolumeMounter) SetUp(fsGroup *int64) error {
 // SetUpAt attaches the disk and bind mounts to the volume path.
 func (b *pwxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
-	glog.V(4).Infof("PWX volume set up: %s %v %v", dir, !notMnt, err)
 
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
+	glog.V(4).Infof("PWX volume set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -242,7 +244,7 @@ func (b *pwxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	globalPDPath := makeGlobalPDPath(b.plugin.host, b.volumeID)
 
-	glog.V(3).Infof("pwx volume %s attached", b.volPath)
+	glog.V(3).Infof("pwx volume %s attached", b.volumeID)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return err
@@ -406,8 +408,6 @@ func (c *pwxVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				PWXVolume: &api.PWXVolumeSource{
 					VolumeID:  volumeID,
-					Partition: 0,
-					ReadOnly:  false,
 				},
 			},
 		},
