@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v69",
+	"GodepVersion": "v74",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -28,8 +28,8 @@
 		},
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",
-			"Comment": "v0.6.2-10-g51fe59a",
-			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
+			"Comment": "v0.10.0-16-gcd7d1bb",
+			"Rev": "cd7d1bbe41066b6c1f19780f895901052150a575"
 		},
 		{
 			"ImportPath": "github.com/abbot/go-http-auth",
@@ -222,6 +222,11 @@
 			"ImportPath": "github.com/boltdb/bolt",
 			"Comment": "v1.1.0-65-gee4a088",
 			"Rev": "ee4a0888a9abe7eefe5a0992ca4cb06864839873"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/gosigar",
+			"Comment": "scotty_09012012-30-gc32d31a",
+			"Rev": "c32d31af94b0e9d3b2877e49c1a581ad5a793343"
 		},
 		{
 			"ImportPath": "github.com/codegangsta/negroni",
@@ -1138,8 +1143,16 @@
 			"Rev": "8096f47503459bcc74d1f4c487b7e6e42e5746b5"
 		},
 		{
+			"ImportPath": "github.com/hashicorp/errwrap",
+			"Rev": "7554cd9344cec97297fa6649b055a8c98c2a1e55"
+		},
+		{
 			"ImportPath": "github.com/hashicorp/go-msgpack/codec",
 			"Rev": "fa3f63826f7c23912c15263591e65d54d080b458"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/go-multierror",
+			"Rev": "d30f09973e19c1dfcd120b2d9c4f168e68d6b5d5"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/golang-lru",
@@ -1148,6 +1161,14 @@
 		{
 			"ImportPath": "github.com/hashicorp/golang-lru/simplelru",
 			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/logutils",
+			"Rev": "0dc08b1671f34c4250ce212759ebd880f743d883"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/memberlist",
+			"Rev": "215aec831f03c9b7c61ac183d3e28fff3c7d3a37"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/raft",
@@ -1232,6 +1253,50 @@
 			"ImportPath": "github.com/kr/pty",
 			"Comment": "release.r56-29-gf7ee69f",
 			"Rev": "f7ee69f31298ecbe5d2b349c711e2547a617d398"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/gossip",
+			"Rev": "306e2a915a6ccb0a971c96264520286093df0c65"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/gossip/proto",
+			"Rev": "306e2a915a6ccb0a971c96264520286093df0c65"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/gossip/proto/state",
+			"Rev": "306e2a915a6ccb0a971c96264520286093df0c65"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/gossip/types",
+			"Rev": "306e2a915a6ccb0a971c96264520286093df0c65"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api",
+			"Rev": "92d192cb3dba2a163066ace617a18c086a6e16df"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api/client",
+			"Rev": "92d192cb3dba2a163066ace617a18c086a6e16df"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/cluster",
+			"Rev": "92d192cb3dba2a163066ace617a18c086a6e16df"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/config",
+			"Rev": "92d192cb3dba2a163066ace617a18c086a6e16df"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/volume",
+			"Rev": "92d192cb3dba2a163066ace617a18c086a6e16df"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/volume/drivers/common",
+			"Rev": "92d192cb3dba2a163066ace617a18c086a6e16df"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/systemutils",
+			"Rev": "44ac83be3ce1b19b1df34efdd763f22b2b554891"
 		},
 		{
 			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/pbutil",
@@ -1591,6 +1656,10 @@
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
 			"Rev": "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
+		},
+		{
+			"ImportPath": "github.com/portworx/kvdb",
+			"Rev": "5e4cf710a5ade396d52e7e082b55fc24617bf5dc"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
@@ -1954,6 +2023,22 @@
 			"ImportPath": "github.com/xyproto/simpleredis",
 			"Comment": "v1.0-13-g5292687",
 			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
+		},
+		{
+			"ImportPath": "go.pedge.io/dlog",
+			"Rev": "df39f69056a766a01437996bd6491558624d068c"
+		},
+		{
+			"ImportPath": "go.pedge.io/dlog/logrus",
+			"Rev": "df39f69056a766a01437996bd6491558624d068c"
+		},
+		{
+			"ImportPath": "go.pedge.io/pb/go/google/protobuf",
+			"Rev": "22334fb7b4e8ded371ec14eec3eee79e436dc71d"
+		},
+		{
+			"ImportPath": "go.pedge.io/proto/time",
+			"Rev": "7cc6be1aa9efff236599f317cf0e7374c2996cf9"
 		},
 		{
 			"ImportPath": "go4.org/errorutil",
