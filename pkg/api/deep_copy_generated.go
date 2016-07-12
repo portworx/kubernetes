@@ -118,6 +118,7 @@ func init() {
 		DeepCopy_api_ObjectMeta,
 		DeepCopy_api_ObjectReference,
 		DeepCopy_api_OwnerReference,
+		DeepCopy_api_PWXVolumeSource,
 		DeepCopy_api_PersistentVolume,
 		DeepCopy_api_PersistentVolumeClaim,
 		DeepCopy_api_PersistentVolumeClaimList,
@@ -1725,6 +1726,24 @@ func DeepCopy_api_OwnerReference(in OwnerReference, out *OwnerReference, c *conv
 	return nil
 }
 
+func DeepCopy_api_PWXVolumeSource(in PWXVolumeSource, out *PWXVolumeSource, c *conversion.Cloner) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.HaLevel = in.HaLevel
+	out.BlockSize = in.BlockSize
+	out.Shared = in.Shared
+	if in.VolumeLabels != nil {
+		in, out := in.VolumeLabels, &out.VolumeLabels
+		*out = make(map[string]string)
+		for key, val := range in {
+			(*out)[key] = val
+		}
+	} else {
+		out.VolumeLabels = nil
+	}
+	return nil
+}
+
 func DeepCopy_api_PersistentVolume(in PersistentVolume, out *PersistentVolume, c *conversion.Cloner) error {
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1984,6 +2003,15 @@ func DeepCopy_api_PersistentVolumeSource(in PersistentVolumeSource, out *Persist
 		}
 	} else {
 		out.VsphereVolume = nil
+	}
+	if in.PWXVolume != nil {
+		in, out := in.PWXVolume, &out.PWXVolume
+		*out = new(PWXVolumeSource)
+		if err := DeepCopy_api_PWXVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.PWXVolume = nil
 	}
 	return nil
 }
@@ -3263,6 +3291,15 @@ func DeepCopy_api_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion
 		}
 	} else {
 		out.VsphereVolume = nil
+	}
+	if in.PWXVolume != nil {
+		in, out := in.PWXVolume, &out.PWXVolume
+		*out = new(PWXVolumeSource)
+		if err := DeepCopy_api_PWXVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.PWXVolume = nil
 	}
 	return nil
 }

@@ -711,6 +711,7 @@ var (
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
 	VsphereVolume         FSType = "vsphereVolume"
+	PWXVolume             FSType = "pwxVolume"
 	All                   FSType = "*"
 )
 
