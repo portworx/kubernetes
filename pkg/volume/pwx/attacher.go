@@ -1,3 +1,4 @@
+// build +ignore
 /*
 Copyright 2016 The Kubernetes Authors All rights reserved.
 
@@ -15,7 +16,7 @@ limitations under the License.
 */
 
 package pwx
-
+/*
 import (
 	"fmt"
 	"os"
@@ -35,12 +36,13 @@ type pwxVolumeAttacher struct {
 	host volume.VolumeHost
 }
 
-var _ volume.Attacher = &pwxVolumeAttacher{}
+//var _ volume.Attacher = &pwxVolumeAttacher{}
 
-var _ volume.AttachableVolumePlugin = &pwxVolumePlugin{}
+//var _ volume.AttachableVolumePlugin = &pwxVolumePlugin{}
 
 func (plugin *pwxVolumePlugin) NewAttacher() (volume.Attacher, error) {
 	return &pwxVolumeAttacher{host: plugin.host}, nil
+	//return nil
 }
 
 func (attacher *pwxVolumeAttacher) Attach(spec *volume.Spec, hostName string) error {
@@ -175,7 +177,9 @@ type pwxVolumeDetacher struct {
 var _ volume.Detacher = &pwxVolumeDetacher{}
 
 func (plugin *pwxVolumePlugin) NewDetacher() (volume.Detacher, error) {
-	return &pwxVolumeDetacher{host: plugin.host}, nil
+	return &pwxVolumeDetacher{
+		host: plugin.host,
+	}, nil
 }
 
 func (detacher *pwxVolumeDetacher) Detach(deviceMountPath string, hostName string) error {
@@ -229,3 +233,4 @@ func (detacher *pwxVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 	}
 	return nil
 }
+*/
