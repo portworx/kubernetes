@@ -1547,6 +1547,32 @@ message OwnerReference {
   optional bool controller = 6;
 }
 
+// Represents a Portworx volume resource.
+message PWXVolumeSource {
+  // VolumeID is the id of the volume
+  optional string volumeID = 1;
+
+  // Filesystem type to mount
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  optional string fsType = 2;
+
+  // Specifies the number of nodes that are
+  // allowed to fail, and yet data is available
+  // A value of 0 implies that data is not erasure coded,
+  // a failure of a node will lead to data loss
+  optional int64 ha_level = 3;
+
+  // Block size for filesystem
+  optional int64 block_size = 4;
+
+  // Shared is true is this volume can be remotely accessed.
+  optional bool shared = 5;
+
+  // VolumeLabels
+  map<string, string> volumeLabels = 6;
+}
+
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
 // It is analogous to a node.
 // More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md
@@ -1710,6 +1736,9 @@ message PersistentVolumeSource {
 
   // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
   optional VsphereVirtualDiskVolumeSource vsphereVolume = 14;
+
+  // PwxVolume represents a portworx volume attached and mounted on kubelets host machine
+  optional PWXVolumeSource pwxVolume = 15;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -2910,6 +2939,9 @@ message VolumeSource {
 
   // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
   optional VsphereVirtualDiskVolumeSource vsphereVolume = 20;
+
+  // PwxVolume represents a portworx volume attached and mounted on kubelets host machine
+  optional PWXVolumeSource pwxVolume = 21;
 }
 
 // Represents a vSphere volume resource.

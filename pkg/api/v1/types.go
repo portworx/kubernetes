@@ -277,6 +277,8 @@ type VolumeSource struct {
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty" protobuf:"bytes,19,opt,name=configMap"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,20,opt,name=vsphereVolume"`
+	// PwxVolume represents a portworx volume attached and mounted on kubelets host machine
+	PWXVolume *PWXVolumeSource `json:"pwxVolume,omitempty" protobuf:"bytes,21,opt,name=pwxVolume"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -339,6 +341,8 @@ type PersistentVolumeSource struct {
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty" protobuf:"bytes,13,opt,name=azureFile"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,14,opt,name=vsphereVolume"`
+	// PwxVolume represents a portworx volume attached and mounted on kubelets host machine
+	PWXVolume *PWXVolumeSource `json:"pwxVolume,omitempty" protobuf:"bytes,15,opt,name=pwxVolume"`
 }
 
 // +genclient=true
@@ -851,6 +855,27 @@ type VsphereVirtualDiskVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+}
+
+// Represents a Portworx volume resource.
+type PWXVolumeSource struct {
+	// VolumeID is the id of the volume
+	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
+	// Filesystem type to mount
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	// Specifies the number of nodes that are
+	// allowed to fail, and yet data is available
+	// A value of 0 implies that data is not erasure coded,
+	// a failure of a node will lead to data loss
+	HaLevel int64 `json:"ha_level,omitempty" protobuf:"varint,3,opt,name=ha_level"`
+	// Block size for filesystem
+	BlockSize int64 `json:"block_size,omitempty" protobuf:"varint,4,opt,name=block_size"`
+	// Shared is true is this volume can be remotely accessed.
+	Shared bool `json:"shared,omitempty" protobuf:"varint,5,opt,name=shared"`
+	// VolumeLabels
+	VolumeLabels map[string]string `protobuf:"bytes,6,rep,name=volumeLabels"`
 }
 
 // Adapts a ConfigMap into a volume.
