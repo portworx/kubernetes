@@ -19,11 +19,21 @@ package pwx
 import (
 	"fmt"
 	"os"
+	"strings"
 
-	//"github.com/golang/glog"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/pwx"
 	//"k8s.io/kubernetes/pkg/volume"
+	osdclient "github.com/libopenstorage/openstorage/api/client"
+	osdvolume "github.com/libopenstorage/openstorage/volume"
+
+)
+
+const (
+	osdMgmtPort = "9007"
+	osdDriverVersion = "v1"
+	
 )
 
 type PWXDiskUtil struct{}
@@ -88,6 +98,88 @@ func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map
 	return "", 0, nil, nil
 }
 
+func (util *PWXDiskUtil) newOsdClient(hostName string) (osdvolume.VolumeDriver, error) {
+	var clientUrl string
+	if !strings.HasPrefix(hostName, "http://") {
+		clientUrl = "http://" + hostName + ":" + osdMgmtPort
+	} else {
+		clientUrl = hostName + ":" + osdMgmtPort
+	}
+
+	client, err := osdclient.NewClient(clientUrl, osdDriverVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.VolumeDriver(), nil
+}
+
+func (util *PWXDiskUtil) AttachVolume(m *pwxVolumeMounter) (string, error) {
+	hostName := m.plugin.host.GetHostName()
+	client, err := util.newOsdClient(hostName)
+	if err != nil {
+		return "", err
+	}
+
+	devicePath, err := client.Attach(m.volumeID)
+	if err != nil {
+		if err == osdvolume.ErrVolAttachedOnRemoteNode {
+			// Volume is already attached to node.
+			glog.Infof("Attach operation is unsuccessful. Volume %q is already attached to another node.", m.volumeID)
+			return "", err
+		}
+		glog.V(2).Infof("AttachVolume on %v failed with error %v", m.volumeID, err)
+		return "", err
+	}
+	return devicePath, err
+}
+
+func (util *PWXDiskUtil) DetachVolume(u *pwxVolumeUnmounter) error {
+	hostName := u.plugin.host.GetHostName()
+	client, err := util.newOsdClient(hostName)
+	if err != nil {
+		return err
+	}
+
+	err = client.Detach(u.volumeID)
+	if err != nil {
+		glog.V(2).Infof("DetachVolume on %v failed with error %v", u.volumeID, err)
+		return err
+	}
+	return err
+}
+
+func (util *PWXDiskUtil) MountVolume(m *pwxVolumeMounter, mountPath string) error {
+	hostName := m.plugin.host.GetHostName()
+	client, err := util.newOsdClient(hostName)
+	if err != nil {
+		return err
+	}
+
+	err = client.Mount(m.volumeID, mountPath)
+	if err != nil {
+		glog.V(2).Infof("MountVolume on %v failed with error %v", m.volumeID, err)
+		return err
+	}
+	return nil
+}
+
+func (util *PWXDiskUtil) UnmountVolume(u *pwxVolumeUnmounter, mountPath string) error {
+	hostName := u.plugin.host.GetHostName()
+	client, err := util.newOsdClient(hostName)
+	if err != nil {
+		return err
+	}
+
+	err = client.Unmount(u.volumeID, mountPath)
+	if err != nil {
+		glog.V(2).Infof("UnmountVolume on %v failed with error %v", u.volumeID, err)
+		return err
+	}
+	return err
+}
+
+
 // Returns list of all paths for given PWX volume mount
 func getDiskByIdPaths(partition string, devicePath string) []string {
 	devicePaths := []string{}
@@ -120,7 +212,6 @@ func pathExists(path string) (bool, error) {
 		return false, err
 	}
 }
-
 
 // Return cloud provider
 func getCloudProvider(cloudProvider cloudprovider.Interface) (*pwx.PWXCloud, error) {
