@@ -328,7 +328,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) 
 			continue
 		}
 		pm.plugins[name] = plugin
-		glog.V(1).Infof("Loaded volume plugin %q", name)
+		glog.V(1).Infof("Loaded volume plugin with my changes %q", name)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

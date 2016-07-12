@@ -33,7 +33,7 @@ import (
 const (
 	osdMgmtPort = "9007"
 	osdDriverVersion = "v1"
-	
+	pxdDevicePrefix = "/dev/pxd/pxd"
 )
 
 type PWXDiskUtil struct{}
@@ -134,14 +134,19 @@ func (util *PWXDiskUtil) AttachVolume(m *pwxVolumeMounter) (string, error) {
 	return devicePath, err
 }
 
-func (util *PWXDiskUtil) DetachVolume(u *pwxVolumeUnmounter) error {
+func (util *PWXDiskUtil) DetachVolume(u *pwxVolumeUnmounter, deviceName string) error {
 	hostName := u.plugin.host.GetHostName()
 	client, err := util.newOsdClient(hostName)
 	if err != nil {
 		return err
 	}
 
-	err = client.Detach(u.volumeID)
+	volumeID, err := getVolumeIDFromDeviceName(deviceName)
+	if err != nil {
+		return err
+	}
+
+	err = client.Detach(volumeID)
 	if err != nil {
 		glog.V(2).Infof("DetachVolume on %v failed with error %v", u.volumeID, err)
 		return err
@@ -164,21 +169,32 @@ func (util *PWXDiskUtil) MountVolume(m *pwxVolumeMounter, mountPath string) erro
 	return nil
 }
 
-func (util *PWXDiskUtil) UnmountVolume(u *pwxVolumeUnmounter, mountPath string) error {
+func (util *PWXDiskUtil) UnmountVolume(u *pwxVolumeUnmounter, deviceName, mountPath string) error {
 	hostName := u.plugin.host.GetHostName()
 	client, err := util.newOsdClient(hostName)
 	if err != nil {
 		return err
 	}
 
-	err = client.Unmount(u.volumeID, mountPath)
+	volumeID, err := getVolumeIDFromDeviceName(deviceName)
 	if err != nil {
-		glog.V(2).Infof("UnmountVolume on %v failed with error %v", u.volumeID, err)
+		return err
+	}
+	
+	err = client.Unmount(volumeID, mountPath)
+	if err != nil {
+		glog.V(2).Infof("UnmountVolume on mountPath: %v, VolName: %v failed with error %v", mountPath, u.volName, err)
 		return err
 	}
 	return err
 }
 
+func getVolumeIDFromDeviceName(deviceName string) (string, error) {
+	if !strings.HasPrefix(deviceName, pxdDevicePrefix) {
+		return "", fmt.Errorf("Invalid DeviceName for PWX: %v", deviceName)
+	}
+	return strings.TrimPrefix(deviceName, pxdDevicePrefix), nil
+}
 
 // Returns list of all paths for given PWX volume mount
 func getDiskByIdPaths(partition string, devicePath string) []string {

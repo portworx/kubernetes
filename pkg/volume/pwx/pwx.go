@@ -189,11 +189,11 @@ type pwxManager interface {
 	// Attach a volume
 	AttachVolume(mounter *pwxVolumeMounter) (string, error)
 	// Detach a volume
-	DetachVolume(unmounter *pwxVolumeUnmounter) error
+	DetachVolume(unmounter *pwxVolumeUnmounter, deviceName string) error
 	// Mount a volume
 	MountVolume(mounter *pwxVolumeMounter, mountDir string) error
 	// Unmount a volume
-	UnmountVolume(unmounter *pwxVolumeUnmounter, mountDir string) error
+	UnmountVolume(unmounter *pwxVolumeUnmounter, deviceName, mountDir string) error
 }
 
 // pwxVolume volumes are pwx block devices
@@ -356,12 +356,18 @@ func (c *pwxVolumeUnmounter) TearDownAt(dir string) error {
 		return os.Remove(dir)
 	}
 
+	deviceName, _, err := mount.GetDeviceNameFromMount(c.mounter, dir)
+	if err != nil {
+		glog.Errorf("Failed to get reference count and device name for volume: %s", dir)
+		return err
+	}
+	
 	// Unmount the bind-mount inside this pod
-	if err := c.manager.UnmountVolume(c, dir); err != nil {
+	if err := c.manager.UnmountVolume(c, deviceName, dir); err != nil {
 		return err
 	}
 
-	if err := c.manager.DetachVolume(c); err != nil {
+	if err := c.manager.DetachVolume(c, deviceName); err != nil {
 		return err
 	}
 	/*notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
