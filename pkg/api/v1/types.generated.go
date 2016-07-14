@@ -14078,11 +14078,12 @@ func (x *PWXVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			yyq2[2] = x.HaLevel != 0
 			yyq2[3] = x.BlockSize != 0
 			yyq2[4] = x.Shared != false
+			yyq2[5] = len(x.VolumeLabels) != 0
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(6)
 			} else {
-				yynn2 = 2
+				yynn2 = 1
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -14212,28 +14213,34 @@ func (x *PWXVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.VolumeLabels == nil {
-					r.EncodeNil()
-				} else {
-					yym19 := z.EncBinary()
-					_ = yym19
-					if false {
+				if yyq2[5] {
+					if x.VolumeLabels == nil {
+						r.EncodeNil()
 					} else {
-						z.F.EncMapStringStringV(x.VolumeLabels, false, e)
+						yym19 := z.EncBinary()
+						_ = yym19
+						if false {
+						} else {
+							z.F.EncMapStringStringV(x.VolumeLabels, false, e)
+						}
 					}
+				} else {
+					r.EncodeNil()
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("VolumeLabels"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.VolumeLabels == nil {
-					r.EncodeNil()
-				} else {
-					yym20 := z.EncBinary()
-					_ = yym20
-					if false {
+				if yyq2[5] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("volumeLabels"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.VolumeLabels == nil {
+						r.EncodeNil()
 					} else {
-						z.F.EncMapStringStringV(x.VolumeLabels, false, e)
+						yym20 := z.EncBinary()
+						_ = yym20
+						if false {
+						} else {
+							z.F.EncMapStringStringV(x.VolumeLabels, false, e)
+						}
 					}
 				}
 			}
@@ -14328,7 +14335,7 @@ func (x *PWXVolumeSource) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			} else {
 				x.Shared = bool(r.DecodeBool())
 			}
-		case "VolumeLabels":
+		case "volumeLabels":
 			if r.TryDecodeAsNil() {
 				x.VolumeLabels = nil
 			} else {
