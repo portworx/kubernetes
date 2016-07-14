@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-px
+spec:
+  hostIPC: true
+  hostNetwork: true
+  containers:
+  - name: nginx
+    image: nginx
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - name: test-volume-pvc
+      mountPath: /data
+    - name: lib
+      mountPath: /var/lib/kubelet
+    - name: run
+      mountPath: /run
+    - name: sys
+      mountPath: /sys
+    ports:
+    - containerPort: 80
+  volumes:
+    - name: test-volume-pvc
+      persistentVolumeClaim:
+        claimName: myclaim-1
+    - name: lib
+      hostPath:
+        path: /var/lib/kubelet
+    - name: run
+      hostPath:
+        path: /run
+    - name: sys
+      hostPath:
+        path: /sys

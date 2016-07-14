@@ -1121,6 +1121,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		PVCName:                       claim.Name,
 	}
 
+	glog.Infof("Getting a new provisioner from plugin : %s", plugin.GetPluginName())
 	// Provision the volume
 	provisioner, err := plugin.NewProvisioner(options)
 	if err != nil {
@@ -1130,6 +1131,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		return
 	}
 
+	glog.Infof("Calling the provision()")
 	volume, err = provisioner.Provision()
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to provision volume: %v", err)

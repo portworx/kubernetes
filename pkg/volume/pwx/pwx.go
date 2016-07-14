@@ -407,6 +407,7 @@ type pwxVolumeProvisioner struct {
 var _ volume.Provisioner = &pwxVolumeProvisioner{}
 
 func (c *pwxVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
+	glog.Infof("In pwx Provision()")
 	volumeID, sizeGB, labels, err := c.manager.CreateVolume(c)
 	if err != nil {
 		return nil, err

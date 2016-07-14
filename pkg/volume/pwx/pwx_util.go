@@ -24,7 +24,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/pwx"
-	//"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume"
+	osdapi "github.com/libopenstorage/openstorage/api"
 	osdclient "github.com/libopenstorage/openstorage/api/client"
 	osdvolume "github.com/libopenstorage/openstorage/volume"
 
@@ -57,9 +58,33 @@ func (util *PWXDiskUtil) DeleteVolume(d *pwxVolumeDeleter) error {
 	return nil
 }
 
-// CreateVolume creates an AWS EBS volume.
+// CreateVolume creates a PWX volume.
 // Returns: volumeID, volumeSize, labels, error
 func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map[string]string, error) {
+	hostName := p.plugin.host.GetHostName()
+	client, err := util.newOsdClient(hostName)
+	if err != nil {
+		return "", 0, nil, err
+	}
+
+	requestBytes := p.options.Capacity.Value()
+	// PWX works in GB
+	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
+
+	spec := osdapi.VolumeSpec{
+		Size: uint64(requestGB),
+	}
+	source := osdapi.Source{}
+	locator := osdapi.VolumeLocator{
+		Name: p.options.PVName,
+		VolumeLabels: *p.options.CloudTags,
+	}
+	volumeID, err := client.Create(&locator, &source, &spec)
+	if err != nil {
+		glog.Infof("Error in Volume Create : %v", err)
+	}
+	return volumeID, requestGB, *p.options.CloudTags, err
+
 	/*cloud, err := getCloudProvider(p.pwxVolume.plugin.host.GetCloudProvider())
 	if err != nil {
 		return "", 0, nil, err
@@ -95,7 +120,7 @@ func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map
 	}
 
 	return name, requestBytes, labels, nil*/
-	return "", 0, nil, nil
+	//return "", 0, nil, nil
 }
 
 func (util *PWXDiskUtil) newOsdClient(hostName string) (osdvolume.VolumeDriver, error) {
