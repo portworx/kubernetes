@@ -126,6 +126,7 @@ enable-debugging-handlers
 enable-garbage-collector
 enable-dynamic-provisioning
 enable-hostpath-provisioner
+enable-pwx-provisioning
 enable-server
 enable-swagger-ui
 enable-garbage-collector

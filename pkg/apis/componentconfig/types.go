@@ -589,6 +589,9 @@ type VolumeConfiguration struct {
 	// enableDynamicProvisioning enables the provisioning of volumes when running within an environment
 	// that supports dynamic provisioning. Defaults to true.
 	EnableDynamicProvisioning bool `json:"enableDynamicProvisioning"`
+	// enablePWXProvisioning enables the controller to provision volumes using
+	// pwx volume driver. Flag EnableDynamicProvisioning also needs to be set to true
+	EnablePWXProvisioning bool `json: "enablePWXProvisioning"`
 	// persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
 	PersistentVolumeRecyclerConfiguration PersistentVolumeRecyclerConfiguration `json:"persitentVolumeRecyclerConfiguration"`
 	// volumePluginDir is the full path of the directory in which the flex

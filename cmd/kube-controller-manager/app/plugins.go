@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/pwx"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
@@ -43,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
-	pwx_volume "k8s.io/kubernetes/pkg/volume/pwx"
+	"k8s.io/kubernetes/pkg/volume/pwx"
 
 	"github.com/golang/glog"
 )
@@ -61,6 +60,7 @@ func ProbeAttachableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(config.FlexVolumePluginDir)...)
+	allPlugins = append(allPlugins, pwx.ProbeVolumePlugins()...)
 	return allPlugins
 }
 
@@ -101,7 +101,7 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, pwx_volume.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, pwx.ProbeVolumePlugins()...)
 
 	return allPlugins
 }
@@ -112,6 +112,8 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 // Not all cloudproviders have provisioning capability, which is the reason for the bool in the return to tell the caller to expect one or not.
 func NewVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) (volume.ProvisionableVolumePlugin, error) {
 	switch {
+	case config.EnableDynamicProvisioning && config.EnablePWXProvisioning:
+		return getProvisionablePluginFromVolumePlugins(pwx.ProbeVolumePlugins())
 	case cloud == nil && config.EnableHostPathProvisioning:
 		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))
 	case cloud != nil && aws.ProviderName == cloud.ProviderName():
@@ -122,8 +124,6 @@ func NewVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.
 		return getProvisionablePluginFromVolumePlugins(cinder.ProbeVolumePlugins())
 	case cloud != nil && vsphere.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(vsphere_volume.ProbeVolumePlugins())
-	case cloud != nil && pwx.ProviderName == cloud.ProviderName():
-		return getProvisionablePluginFromVolumePlugins(pwx_volume.ProbeVolumePlugins())
 	}
 	return nil, nil
 }
