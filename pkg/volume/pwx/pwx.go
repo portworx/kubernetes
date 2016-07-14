@@ -413,6 +413,7 @@ func (c *pwxVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		return nil, err
 	}
 
+	glog.Infof("Labels : %v", labels)
 	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			Name:   c.options.PVName,
