@@ -1,4 +1,4 @@
-package client
+package volume
 
 import (
 	"bytes"
@@ -8,8 +8,8 @@ import (
 	"io/ioutil"
 
 	"github.com/libopenstorage/openstorage/api"
+	"github.com/libopenstorage/openstorage/api/client"
 	"github.com/libopenstorage/openstorage/volume"
-	"github.com/libopenstorage/openstorage/volume/drivers/common"
 )
 
 const (
@@ -20,11 +20,11 @@ const (
 
 type volumeClient struct {
 	volume.IODriver
-	c *Client
+	c *client.Client
 }
 
-func newVolumeClient(c *Client) volume.VolumeDriver {
-	return &volumeClient{common.IONotSupported, c}
+func newVolumeClient(c *client.Client) volume.VolumeDriver {
+	return &volumeClient{volume.IONotSupported, c}
 }
 
 // String description of this driver.
@@ -85,7 +85,8 @@ func (v *volumeClient) GraphDriverExists(id string) bool {
 }
 
 func (v *volumeClient) GraphDriverDiff(id string, parent string) io.Writer {
-	return bytes.NewBuffer(v.c.Get().Resource(graphPath + "/diff?id=" + id + "&parent=" + parent).Do().body)
+	body, _ := v.c.Get().Resource(graphPath + "/diff?id=" + id + "&parent=" + parent).Do().Body()
+	return bytes.NewBuffer(body)
 }
 
 func (v *volumeClient) GraphDriverChanges(id string, parent string) ([]api.GraphDriverChanges, error) {
@@ -210,8 +211,9 @@ func (v *volumeClient) Alerts(volumeID string) (*api.Alerts, error) {
 	return alerts, nil
 }
 
-func formatRespErr(resp *Response) error {
-	return fmt.Errorf("%d: %s", resp.statusCode, string(resp.body))
+func formatRespErr(resp *client.Response) error {
+	body, _ := resp.Body()
+	return fmt.Errorf("%d: %s", resp.StatusCode(), string(body))
 }
 
 // Active Requests on this volume.
@@ -221,7 +223,7 @@ func (v *volumeClient) GetActiveRequests(id string) (*api.ActiveRequests, error)
 	requests := &api.ActiveRequests{}
 	resp := v.c.Get().Resource(volumePath + "/requests").Instance(id).Do()
 
-	if resp.err != nil {
+	if resp.Error() != nil {
 		return nil, formatRespErr(resp)
 	}
 
