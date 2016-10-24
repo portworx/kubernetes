@@ -1862,10 +1862,6 @@
 			"Rev": "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
 		},
 		{
-			"ImportPath": "github.com/portworx/kvdb",
-			"Rev": "5e4cf710a5ade396d52e7e082b55fc24617bf5dc"
-		},
-		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
 			"Comment": "0.7.0-52-ge51041b",
 			"Rev": "e51041b3fa41cece0dca035740ba6411905be473"
@@ -2298,22 +2294,6 @@
 			"ImportPath": "github.com/xyproto/simpleredis",
 			"Comment": "v1.0-13-g5292687",
 			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
-		},
-		{
-			"ImportPath": "go.pedge.io/dlog",
-			"Rev": "df39f69056a766a01437996bd6491558624d068c"
-		},
-		{
-			"ImportPath": "go.pedge.io/dlog/logrus",
-			"Rev": "df39f69056a766a01437996bd6491558624d068c"
-		},
-		{
-			"ImportPath": "go.pedge.io/pb/go/google/protobuf",
-			"Rev": "22334fb7b4e8ded371ec14eec3eee79e436dc71d"
-		},
-		{
-			"ImportPath": "go.pedge.io/proto/time",
-			"Rev": "7cc6be1aa9efff236599f317cf0e7374c2996cf9"
 		},
 		{
 			"ImportPath": "go4.org/errorutil",
