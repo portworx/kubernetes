@@ -321,7 +321,7 @@ type VolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
 	// PwxVolume represents a portworx volume attached and mounted on kubelets host machine
 	// +optional
-	PWXVolume *PWXVolumeSource `json:"pwxVolume,omitempty" protobuf:"bytes,21,opt,name=pwxVolume"`
+	PWXVolume *PWXVolumeSource `json:"pwxVolume,omitempty" protobuf:"bytes,23,opt,name=pwxVolume"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -407,7 +407,7 @@ type PersistentVolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,16,opt,name=azureDisk"`
 	// PwxVolume represents a portworx volume attached and mounted on kubelets host machine
 	// +optional
-	PWXVolume *PWXVolumeSource `json:"pwxVolume,omitempty" protobuf:"bytes,15,opt,name=pwxVolume"`
+	PWXVolume *PWXVolumeSource `json:"pwxVolume,omitempty" protobuf:"bytes,17,opt,name=pwxVolume"`
 }
 
 // +genclient=true
