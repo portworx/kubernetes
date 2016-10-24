@@ -106,6 +106,15 @@ func TestAssumePodScheduled(t *testing.T) {
 		}
 		n := cache.nodes[nodeName]
 		deepEqualWithoutGeneration(t, i, n, tt.wNodeInfo)
+
+		for _, pod := range tt.pods {
+			if err := cache.ForgetPod(pod); err != nil {
+				t.Fatalf("ForgetPod failed: %v", err)
+			}
+		}
+		if cache.nodes[nodeName] != nil {
+			t.Errorf("NodeInfo should be cleaned for %s", nodeName)
+		}
 	}
 }
 
@@ -443,6 +452,36 @@ func TestRemovePod(t *testing.T) {
 
 		n = cache.nodes[nodeName]
 		if n != nil {
+			t.Errorf("#%d: expecting pod deleted and nil node info, get=%s", i, n)
+		}
+	}
+}
+
+func TestForgetPod(t *testing.T) {
+	nodeName := "node"
+	basePod := makeBasePod(nodeName, "test", "100m", "500", []api.ContainerPort{{HostPort: 80}})
+	tests := []struct {
+		pods []*api.Pod
+	}{{
+		pods: []*api.Pod{basePod},
+	}}
+	now := time.Now()
+	ttl := 10 * time.Second
+
+	for i, tt := range tests {
+		cache := newSchedulerCache(ttl, time.Second, nil)
+		for _, pod := range tt.pods {
+			if err := cache.assumePod(pod, now); err != nil {
+				t.Fatalf("assumePod failed: %v", err)
+			}
+		}
+		for _, pod := range tt.pods {
+			if err := cache.ForgetPod(pod); err != nil {
+				t.Fatalf("ForgetPod failed: %v", err)
+			}
+		}
+		cache.cleanupAssumedPods(now.Add(2 * ttl))
+		if n := cache.nodes[nodeName]; n != nil {
 			t.Errorf("#%d: expecting pod deleted and nil node info, get=%s", i, n)
 		}
 	}

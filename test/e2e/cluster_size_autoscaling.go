@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -59,7 +60,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		c = f.Client
 		framework.SkipUnlessProviderIs("gce", "gke")
 
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 		cpu := nodes.Items[0].Status.Capacity[api.ResourceCPU]
@@ -97,7 +98,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	It("shouldn't increase cluster size if pending pod is too large [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		By("Creating unschedulable pod")
 		ReserveMemory(f, "memory-reservation", 1, memCapacityMb, false)
-		defer framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "memory-reservation")
 
 		By("Waiting for scale up hoping it won't happen")
 		// Verfiy, that the appropreate event was generated.
@@ -124,7 +125,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 	It("should increase cluster size if pending pods are small [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
-		defer framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "memory-reservation")
 
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
@@ -143,7 +144,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
 
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
-		defer framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "memory-reservation")
 
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
@@ -165,7 +166,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 	It("should increase cluster size if pods are pending due to host port conflict [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		CreateHostPortPods(f, "host-port", nodeCount+2, false)
-		defer framework.DeleteRC(f.Client, f.Namespace.Name, "host-port")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "host-port")
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+2 }, scaleUpTimeout))
@@ -217,7 +218,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
-		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "node-selector"))
+		framework.ExpectNoError(framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "node-selector"))
 	})
 
 	It("should scale up correct target pool [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -232,7 +233,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		By("Creating rc with 2 pods too big to fit default-pool but fitting extra-pool")
 		ReserveMemory(f, "memory-reservation", 2, 2*memCapacityMb, false)
-		defer framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "memory-reservation")
 
 		// Apparently GKE master is restarted couple minutes after the node pool is added
 		// reseting all the timers in scale down code. Adding 5 extra minutes to workaround
@@ -456,12 +457,12 @@ func doPut(url, content string) (string, error) {
 func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nodeSelector map[string]string, expectRunning bool) {
 	By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
 
-	config := &framework.RCConfig{
+	config := &testutils.RCConfig{
 		Client:       f.Client,
 		Name:         "node-selector",
 		Namespace:    f.Namespace.Name,
 		Timeout:      defaultTimeout,
-		Image:        "gcr.io/google_containers/pause-amd64:3.0",
+		Image:        framework.GetPauseImageName(f.Client),
 		Replicas:     replicas,
 		HostPorts:    map[string]int{"port1": 4321},
 		NodeSelector: map[string]string{"cluster-autoscaling-test.special-node": "true"},
@@ -474,7 +475,7 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 
 func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
 	By(fmt.Sprintf("Running RC which reserves host port"))
-	config := &framework.RCConfig{
+	config := &testutils.RCConfig{
 		Client:    f.Client,
 		Name:      id,
 		Namespace: f.Namespace.Name,
@@ -492,7 +493,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 func ReserveCpu(f *framework.Framework, id string, replicas, millicores int) {
 	By(fmt.Sprintf("Running RC which reserves %v millicores", millicores))
 	request := int64(millicores / replicas)
-	config := &framework.RCConfig{
+	config := &testutils.RCConfig{
 		Client:     f.Client,
 		Name:       id,
 		Namespace:  f.Namespace.Name,
@@ -507,7 +508,7 @@ func ReserveCpu(f *framework.Framework, id string, replicas, millicores int) {
 func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool) {
 	By(fmt.Sprintf("Running RC which reserves %v MB of memory", megabytes))
 	request := int64(1024 * 1024 * megabytes / replicas)
-	config := &framework.RCConfig{
+	config := &testutils.RCConfig{
 		Client:     f.Client,
 		Name:       id,
 		Namespace:  f.Namespace.Name,
@@ -575,8 +576,8 @@ func waitForAllCaPodsReadyInNamespace(f *framework.Framework, c *client.Client) 
 		glog.Infof("Some pods are not ready yet: %v", notready)
 	}
 	glog.Info("Timeout on waiting for pods being ready")
-	glog.Info(framework.RunKubectlOrDie("get", "pods", "-o json", "--all-namespaces"))
-	glog.Info(framework.RunKubectlOrDie("get", "nodes", "-o json"))
+	glog.Info(framework.RunKubectlOrDie("get", "pods", "-o", "json", "--all-namespaces"))
+	glog.Info(framework.RunKubectlOrDie("get", "nodes", "-o", "json"))
 
 	// Some pods are still not running.
 	return fmt.Errorf("Some pods are still not running: %v", notready)

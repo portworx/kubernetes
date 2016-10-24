@@ -11,7 +11,7 @@
 
 ### Are you ...
 
-  * Interested in learning more about using Kubernetes?  Please see our user-facing documentation on [kubernetes.io](http://kubernetes.io)
+  * Interested in learning more about using Kubernetes?  Please see our user-facing documentation on [kubernetes.io](http://kubernetes.io) or try the [Scalable Microservices with Kubernetes](https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615) course
   * Interested in hacking on the core Kubernetes code base?  Keep reading!
 
 <hr>
@@ -133,6 +133,11 @@ For Q&A, our threads are at:
 
 If you're interested in being a contributor and want to get involved in developing Kubernetes, start in the [Kubernetes Developer Guide](docs/devel/README.md) and also review the [contributor guidelines](CONTRIBUTING.md).
 
+Or, if you just have an idea for a new feature, see the [Kubernetes Features](https://github.com/kubernetes/features) repository for details on how to propose it.
+
+Also, please see our [expectations](docs/devel/community-expectations.md) for members of
+the Kubernetes community.
+
 ### Support
 
 While there are many different channels that you can use to get ahold of us, you can help make sure that we are efficient in getting you the help that you need.
@@ -141,9 +146,9 @@ If you need support, start with the [troubleshooting guide](docs/troubleshooting
 
 That said, if you have questions, reach out to us one way or another.  We don't bite!
 
-### Community resources:
+### Community resources
 
-* **Awesome-kubernetes**:
+* **Awesome-kubernetes** - [http://ramitsurana.github.io/awesome-kubernetes](http://ramitsurana.github.io/awesome-kubernetes)
 
 You can find more projects, tools and articles related to Kubernetes on the  [awesome-kubernetes](https://github.com/ramitsurana/awesome-kubernetes) list. Add your project there and help us make it better.
 
@@ -151,5 +156,8 @@ You can find more projects, tools and articles related to Kubernetes on the  [aw
 
 Instructive & educational resources for the Kubernetes community. By the community.
 
+* **Community Documentation**
+
+Here you can learn more about the current happenings in the [kubernetes community](https://github.com/kubernetes/community).
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()

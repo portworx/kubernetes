@@ -146,6 +146,19 @@ func (plugin *iscsiPlugin) execCommand(command string, args []string) ([]byte, e
 	return cmd.CombinedOutput()
 }
 
+func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	iscsiVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			ISCSI: &api.ISCSIVolumeSource{
+				TargetPortal: volumeName,
+				IQN:          volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(iscsiVolume), nil
+}
+
 type iscsiDisk struct {
 	volName string
 	podUID  types.UID
@@ -228,5 +241,5 @@ func getVolumeSource(spec *volume.Spec) (*api.ISCSIVolumeSource, bool, error) {
 		return spec.PersistentVolume.Spec.ISCSI, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a ISCSI volume type")
+	return nil, false, fmt.Errorf("Spec does not reference an ISCSI volume type")
 }

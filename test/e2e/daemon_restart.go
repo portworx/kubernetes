@@ -24,15 +24,15 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -176,7 +176,7 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 	failedContainers := 0
 	containerRestartNodes := sets.NewString()
 	for _, p := range pods.Items {
-		for _, v := range framework.FailedContainers(&p) {
+		for _, v := range testutils.FailedContainers(&p) {
 			failedContainers = failedContainers + v.Restarts
 			containerRestartNodes.Insert(p.Spec.NodeName)
 		}
@@ -187,12 +187,12 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("daemonrestart")
-	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(util.NewUUID())
+	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(uuid.NewUUID())
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
-	var config framework.RCConfig
-	var controller *controllerframework.Controller
+	var config testutils.RCConfig
+	var controller *cache.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
 	var tracker *podTracker
@@ -204,7 +204,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 		// All the restart tests need an rc and a watch on pods of the rc.
 		// Additionally some of them might scale the rc during the test.
-		config = framework.RCConfig{
+		config = testutils.RCConfig{
 			Client:      f.Client,
 			Name:        rcName,
 			Namespace:   ns,
@@ -217,7 +217,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 		stopCh = make(chan struct{})
 		tracker = newPodTracker()
-		newPods, controller = controllerframework.NewInformer(
+		newPods, controller = cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 					options.LabelSelector = labelSelector
@@ -230,7 +230,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 			},
 			&api.Pod{},
 			0,
-			controllerframework.ResourceEventHandlerFuncs{
+			cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					tracker.remember(obj.(*api.Pod), ADD)
 				},
@@ -262,7 +262,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 		// that it had the opportunity to create/delete pods, if it were going to do so. Scaling the RC
 		// to the same size achieves this, because the scale operation advances the RC's sequence number
 		// and awaits it to be observed and reported back in the RC's status.
-		framework.ScaleRC(f.Client, ns, rcName, numPods, true)
+		framework.ScaleRC(f.Client, f.ClientSet, ns, rcName, numPods, true)
 
 		// Only check the keys, the pods can be different if the kubelet updated it.
 		// TODO: Can it really?
@@ -293,14 +293,14 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 		restarter.kill()
 		// This is best effort to try and create pods while the scheduler is down,
 		// since we don't know exactly when it is restarted after the kill signal.
-		framework.ExpectNoError(framework.ScaleRC(f.Client, ns, rcName, numPods+5, false))
+		framework.ExpectNoError(framework.ScaleRC(f.Client, f.ClientSet, ns, rcName, numPods+5, false))
 		restarter.waitUp()
-		framework.ExpectNoError(framework.ScaleRC(f.Client, ns, rcName, numPods+5, true))
+		framework.ExpectNoError(framework.ScaleRC(f.Client, f.ClientSet, ns, rcName, numPods+5, true))
 	})
 
 	It("Kubelet should not restart containers across restart", func() {
 
-		nodeIPs, err := getNodePublicIps(f.Client)
+		nodeIPs, err := getNodePublicIps(f.ClientSet)
 		framework.ExpectNoError(err)
 		preRestarts, badNodes := getContainerRestarts(f.Client, ns, labelSelector)
 		if preRestarts != 0 {
@@ -313,7 +313,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		postRestarts, badNodes := getContainerRestarts(f.Client, ns, labelSelector)
 		if postRestarts != preRestarts {
-			framework.DumpNodeDebugInfo(f.Client, badNodes)
+			framework.DumpNodeDebugInfo(f.Client, badNodes, framework.Logf)
 			framework.Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v \n\n %+v", preRestarts, postRestarts, badNodes, tracker)
 		}
 	})

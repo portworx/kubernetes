@@ -23,10 +23,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -93,6 +94,7 @@ func waitTillNPodsRunningOnNodes(c *client.Client, nodeNames sets.String, podNam
 // updates labels of nodes given by nodeNames.
 // In case a given label already exists, it overwrites it. If label to remove doesn't exist
 // it silently ignores it.
+// TODO: migrate to use framework.AddOrUpdateLabelOnNode/framework.RemoveLabelOffNode
 func updateNodeLabels(c *client.Client, nodeNames sets.String, toAdd, toRemove map[string]string) {
 	const maxRetries = 5
 	for nodeName := range nodeNames {
@@ -135,7 +137,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 
 	BeforeEach(func() {
 		c = f.Client
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		numNodes = len(nodes.Items)
 		nodeNames = sets.NewString()
 		// If there are a lot of nodes, we don't want to use all of them
@@ -183,9 +185,9 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			It(name, func() {
 				totalPods := itArg.podsPerNode * numNodes
 				By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
-				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(util.NewUUID()))
+				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
-				Expect(framework.RunRC(framework.RCConfig{
+				Expect(framework.RunRC(testutils.RCConfig{
 					Client:       f.Client,
 					Name:         rcName,
 					Namespace:    f.Namespace.Name,
@@ -204,7 +206,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				}
 
 				By("Deleting the RC")
-				framework.DeleteRC(f.Client, f.Namespace.Name, rcName)
+				framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, rcName)
 				// Check that the pods really are gone by querying /runningpods on the
 				// node. The /runningpods handler checks the container runtime (or its
 				// cache) and  returns a list of running pods. Some possible causes of

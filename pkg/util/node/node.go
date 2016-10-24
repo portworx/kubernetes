@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os/exec"
+	"os"
 	"strings"
 	"time"
 
@@ -28,16 +28,17 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 func GetHostname(hostnameOverride string) string {
-	hostname := hostnameOverride
-	if string(hostname) == "" {
-		nodename, err := exec.Command("uname", "-n").Output()
+	var hostname string = hostnameOverride
+	if hostname == "" {
+		nodename, err := os.Hostname()
 		if err != nil {
 			glog.Fatalf("Couldn't determine hostname: %v", err)
 		}
-		hostname = string(nodename)
+		hostname = nodename
 	}
 	return strings.ToLower(strings.TrimSpace(hostname))
 }
@@ -86,7 +87,7 @@ func GetZoneKey(node *api.Node) string {
 }
 
 // SetNodeCondition updates specific node condition with patch operation.
-func SetNodeCondition(c clientset.Interface, node string, condition api.NodeCondition) error {
+func SetNodeCondition(c clientset.Interface, node types.NodeName, condition api.NodeCondition) error {
 	generatePatch := func(condition api.NodeCondition) ([]byte, error) {
 		raw, err := json.Marshal(&[]api.NodeCondition{condition})
 		if err != nil {
@@ -99,6 +100,6 @@ func SetNodeCondition(c clientset.Interface, node string, condition api.NodeCond
 	if err != nil {
 		return nil
 	}
-	_, err = c.Core().Nodes().PatchStatus(node, patch)
+	_, err = c.Core().Nodes().PatchStatus(string(node), patch)
 	return err
 }

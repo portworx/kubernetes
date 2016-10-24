@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 		c = f.Client
 	})
 
-	It("should create pod that uses dns [Conformance]", func() {
+	It("should create pod that uses dns", func() {
 		mkpath := func(file string) string {
 			return filepath.Join(framework.TestContext.RepoRoot, "examples/cluster-dns", file)
 		}
@@ -139,7 +139,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
 		// that we cannot wait for the pods to be running because our pods terminate by themselves.
 		for _, ns := range namespaces {
-			err := framework.WaitForPodNotPending(c, ns.Name, frontendPodName)
+			err := framework.WaitForPodNotPending(c, ns.Name, frontendPodName, "")
 			framework.ExpectNoError(err)
 		}
 

@@ -39,15 +39,16 @@ const maxPriority float32 = 10
 const zoneWeighting = 2.0 / 3.0
 
 type SelectorSpread struct {
-	podLister        algorithm.PodLister
 	serviceLister    algorithm.ServiceLister
 	controllerLister algorithm.ControllerLister
 	replicaSetLister algorithm.ReplicaSetLister
 }
 
-func NewSelectorSpreadPriority(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister) algorithm.PriorityFunction {
+func NewSelectorSpreadPriority(
+	serviceLister algorithm.ServiceLister,
+	controllerLister algorithm.ControllerLister,
+	replicaSetLister algorithm.ReplicaSetLister) algorithm.PriorityFunction {
 	selectorSpread := &SelectorSpread{
-		podLister:        podLister,
 		serviceLister:    serviceLister,
 		controllerLister: controllerLister,
 		replicaSetLister: replicaSetLister,
@@ -55,36 +56,41 @@ func NewSelectorSpreadPriority(podLister algorithm.PodLister, serviceLister algo
 	return selectorSpread.CalculateSpreadPriority
 }
 
-// CalculateSpreadPriority spreads pods across hosts and zones, considering pods belonging to the same service or replication controller.
-// When a pod is scheduled, it looks for services or RCs that match the pod, then finds existing pods that match those selectors.
-// It favors nodes that have fewer existing matching pods.
-// i.e. it pushes the scheduler towards a node where there's the smallest number of
-// pods which match the same service selectors or RC selectors as the pod being scheduled.
-// Where zone information is included on the nodes, it favors nodes in zones with fewer existing matching pods.
-func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+// Returns selectors of services, RCs and RSs matching the given pod.
+func getSelectors(pod *api.Pod, sl algorithm.ServiceLister, cl algorithm.ControllerLister, rsl algorithm.ReplicaSetLister) []labels.Selector {
 	selectors := make([]labels.Selector, 0, 3)
-	if services, err := s.serviceLister.GetPodServices(pod); err == nil {
+	if services, err := sl.GetPodServices(pod); err == nil {
 		for _, service := range services {
 			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
 		}
 	}
-	if rcs, err := s.controllerLister.GetPodControllers(pod); err == nil {
+	if rcs, err := cl.GetPodControllers(pod); err == nil {
 		for _, rc := range rcs {
 			selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))
 		}
 	}
-	if rss, err := s.replicaSetLister.GetPodReplicaSets(pod); err == nil {
+	if rss, err := rsl.GetPodReplicaSets(pod); err == nil {
 		for _, rs := range rss {
 			if selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
 				selectors = append(selectors, selector)
 			}
 		}
 	}
+	return selectors
+}
 
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return nil, err
-	}
+func (s *SelectorSpread) getSelectors(pod *api.Pod) []labels.Selector {
+	return getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister)
+}
+
+// CalculateSpreadPriority spreads pods across hosts and zones, considering pods belonging to the same service or replication controller.
+// When a pod is scheduled, it looks for services, RCs or RSs that match the pod, then finds existing pods that match those selectors.
+// It favors nodes that have fewer existing matching pods.
+// i.e. it pushes the scheduler towards a node where there's the smallest number of
+// pods which match the same service, RC or RS selectors as the pod being scheduled.
+// Where zone information is included on the nodes, it favors nodes in zones with fewer existing matching pods.
+func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
+	selectors := s.getSelectors(pod)
 
 	// Count similar pods by node
 	countsByNodeName := make(map[string]float32, len(nodes))
@@ -193,10 +199,9 @@ func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister
 // CalculateAntiAffinityPriority spreads pods by minimizing the number of pods belonging to the same service
 // on machines with the same value for a particular label.
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
-func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
 	var nsServicePods []*api.Pod
-
-	if services, err := s.serviceLister.GetPodServices(pod); err == nil {
+	if services, err := s.serviceLister.GetPodServices(pod); err == nil && len(services) > 0 {
 		// just use the first service and get the other pods within the service
 		// TODO: a separate predicate can be created that tries to handle all services for the pod
 		selector := labels.SelectorFromSet(services[0].Spec.Selector)
@@ -210,11 +215,6 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, nodeNa
 				nsServicePods = append(nsServicePods, nsPod)
 			}
 		}
-	}
-
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return nil, err
 	}
 
 	// separate out the nodes that have the label from the ones that don't

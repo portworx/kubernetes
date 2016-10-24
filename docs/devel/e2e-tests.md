@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/devel/e2e-tests.md).
+[here](http://releases.k8s.io/release-1.4/docs/devel/e2e-tests.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -56,7 +56,9 @@ Updated: 5/3/2016
     - [Debugging clusters](#debugging-clusters)
     - [Local clusters](#local-clusters)
       - [Testing against local clusters](#testing-against-local-clusters)
+    - [Version-skewed and upgrade testing](#version-skewed-and-upgrade-testing)
   - [Kinds of tests](#kinds-of-tests)
+    - [Viper configuration and hierarchichal test parameters.](#viper-configuration-and-hierarchichal-test-parameters)
     - [Conformance tests](#conformance-tests)
     - [Defining Conformance Subset](#defining-conformance-subset)
   - [Continuous Integration](#continuous-integration)
@@ -123,15 +125,6 @@ go run hack/e2e.go -v --build
 # Create a fresh cluster.  Deletes a cluster first, if it exists
 go run hack/e2e.go -v --up
 
-# Test if a cluster is up.
-go run hack/e2e.go -v --isup
-
-# Push code to an existing cluster
-go run hack/e2e.go -v --push
-
-# Push to an existing cluster, or bring up a cluster if it's down.
-go run hack/e2e.go -v --pushup
-
 # Run all tests
 go run hack/e2e.go -v --test
 
@@ -144,13 +137,16 @@ go run hack/e2e.go -v --test --test_args="--ginkgo.skip=Pods.*env"
 # Run tests in parallel, skip any that must be run serially
 GINKGO_PARALLEL=y go run hack/e2e.go --v --test --test_args="--ginkgo.skip=\[Serial\]"
 
+# Run tests in parallel, skip any that must be run serially and keep the test namespace if test failed
+GINKGO_PARALLEL=y go run hack/e2e.go --v --test --test_args="--ginkgo.skip=\[Serial\] --delete-namespace-on-falure=false"
+
 # Flags can be combined, and their actions will take place in this order:
-# --build, --push|--up|--pushup, --test, --down
+# --build, --up, --test, --down
 #
 # You can also specify an alternative provider, such as 'aws'
 #
 # e.g.:
-KUBERNETES_PROVIDER=aws go run hack/e2e.go -v --build --pushup --test --down
+KUBERNETES_PROVIDER=aws go run hack/e2e.go -v --build --up --test --down
 
 # -ctl can be used to quickly call kubectl against your e2e cluster. Useful for
 # cleaning up after a failed test or viewing logs. Use -v to avoid suppressing
@@ -296,7 +292,7 @@ Next, specify the docker repository where your ci images will be pushed.
 	* `${FEDERATION_PUSH_REPO_BASE}/federation-controller-manager`
 
 	These repositories must allow public read access, as the e2e node docker daemons will not have any credentials. If you're using
-	gce/gke as your provider, the repositories will have read-access by default.
+	GCE/GKE as your provider, the repositories will have read-access by default.
 
 #### Build
 
@@ -390,6 +386,9 @@ sudo PATH=$PATH hack/local-up-cluster.sh
 This will start a single-node Kubernetes cluster than runs pods using the local
 docker daemon. Press Control-C to stop the cluster.
 
+You can generate a valid kubeconfig file by following instructions printed at the
+end of aforementioned script.
+
 #### Testing against local clusters
 
 In order to run an E2E test against a locally running cluster, point the tests
@@ -397,13 +396,79 @@ at a custom host directly:
 
 ```sh
 export KUBECONFIG=/path/to/kubeconfig
-go run hack/e2e.go -v --test --check_node_count=false --test_args="--host=http://127.0.0.1:8080"
+export KUBE_MASTER_IP="http://127.0.0.1:<PORT>"
+export KUBE_MASTER=local
+go run hack/e2e.go -v --test
 ```
 
 To control the tests that are run:
 
 ```sh
-go run hack/e2e.go -v --test --check_node_count=false --test_args="--host=http://127.0.0.1:8080" --ginkgo.focus="Secrets"
+go run hack/e2e.go -v --test --check_node_count=false --test_args="--ginkgo.focus="Secrets"
+```
+
+### Version-skewed and upgrade testing
+
+We run version-skewed tests to check that newer versions of Kubernetes work
+similarly enough to older versions.  The general strategy is to cover the following cases:
+
+1. One version of `kubectl` with another version of the cluster and tests (e.g.
+   that v1.2 and v1.4 `kubectl` doesn't break v1.3 tests running against a v1.3
+   cluster).
+1. A newer version of the Kubernetes master with older nodes and tests (e.g.
+   that upgrading a master to v1.3 with nodes at v1.2 still passes v1.2 tests).
+1. A newer version of the whole cluster with older tests (e.g. that a cluster
+   upgraded---master and nodes---to v1.3 still passes v1.2 tests).
+1. That an upgraded cluster functions the same as a brand-new cluster of the
+   same version (e.g. a cluster upgraded to v1.3 passes the same v1.3 tests as
+   a newly-created v1.3 cluster).
+
+[hack/e2e-runner.sh](http://releases.k8s.io/HEAD/hack/jenkins/e2e-runner.sh) is
+the authoritative source on how to run version-skewed tests, but below is a
+quick-and-dirty tutorial.
+
+```sh
+# Assume you have two copies of the Kubernetes repository checked out, at
+# ./kubernetes and ./kubernetes_old
+
+# If using GKE:
+export KUBERNETES_PROVIDER=gke
+export CLUSTER_API_VERSION=${OLD_VERSION}
+
+# Deploy a cluster at the old version; see above for more details
+cd ./kubernetes_old
+go run ./hack/e2e.go -v --up
+
+# Upgrade the cluster to the new version
+#
+# If using GKE, add --upgrade-target=${NEW_VERSION}
+#
+# You can target Feature:MasterUpgrade or Feature:ClusterUpgrade
+cd ../kubernetes
+go run ./hack/e2e.go -v --test --check_version_skew=false --test_args="--ginkgo.focus=\[Feature:MasterUpgrade\]"
+
+# Run old tests with new kubectl
+cd ../kubernetes_old
+go run ./hack/e2e.go -v --test --test_args="--kubectl-path=$(pwd)/../kubernetes/cluster/kubectl.sh"
+```
+
+If you are just testing version-skew, you may want to just deploy at one
+version and then test at another version, instead of going through the whole
+upgrade process:
+
+```sh
+# With the same setup as above
+
+# Deploy a cluster at the new version
+cd ./kubernetes
+go run ./hack/e2e.go -v --up
+
+# Run new tests with old kubectl
+go run ./hack/e2e.go -v --test --test_args="--kubectl-path=$(pwd)/../kubernetes_old/cluster/kubectl.sh"
+
+# Run old tests with new kubectl
+cd ../kubernetes_old
+go run ./hack/e2e.go -v --test --test_args="--kubectl-path=$(pwd)/../kubernetes/cluster/kubectl.sh"
 ```
 
 ## Kinds of tests
@@ -448,6 +513,20 @@ not enabled by default due to being incomplete or potentially subject to
 breaking changes, it does *not* block the merge-queue, and thus should run in
 some separate test suites owned by the feature owner(s)
 (see [Continuous Integration](#continuous-integration) below).
+
+### Viper configuration and hierarchichal test parameters.
+
+The future of e2e test configuration idioms will be increasingly defined using viper, and decreasingly via flags.
+
+Flags in general fall apart once tests become sufficiently complicated.  So, even if we could use another flag library, it wouldn't be ideal.
+
+To use viper, rather than flags, to configure your tests:
+
+- Just add "e2e.json" to the current directory you are in, and define parameters in it... i.e. `"kubeconfig":"/tmp/x"`.
+
+Note that advanced testing parameters, and hierarchichally defined parameters, are only defined in viper, to see what they are, you can dive into [TestContextType](../../test/e2e/framework/test_context.go).
+
+In time, it is our intent to add or autogenerate a sample viper configuration that includes all e2e parameters, to ship with kubernetes.
 
 ### Conformance tests
 

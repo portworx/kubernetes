@@ -46,11 +46,11 @@ func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedOb
 
 // NewREST returns a RESTStorage object that will work against clusters.
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/clusters"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &federation.ClusterList{} }
-	storageInterface := opts.Decorator(
-		opts.Storage,
+	storageInterface, _ := opts.Decorator(
+		opts.StorageConfig,
 		100,
 		&federation.Cluster{},
 		prefix,
@@ -73,6 +73,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		},
 		PredicateFunc:           cluster.MatchCluster,
 		QualifiedResource:       federation.Resource("clusters"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: cluster.Strategy,

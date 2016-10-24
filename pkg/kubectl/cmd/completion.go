@@ -22,30 +22,32 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	completion_long = `Output shell completion code for the given shell (bash or zsh).
+var (
+	completion_long = templates.LongDesc(`
+		Output shell completion code for the given shell (bash or zsh).
 
-This command prints shell code which must be evaluation to provide interactive
-completion of kubectl commands.
-`
-	completion_example = `
-$ source <(kubectl completion bash)
+		This command prints shell code which must be evaluation to provide interactive
+		completion of kubectl commands.
 
-will load the kubectl completion code for bash. Note that this depends on the
-bash-completion framework. It must be sourced before sourcing the kubectl
-completion, e.g. on the Mac:
+		    $ source <(kubectl completion bash)
 
-$ brew install bash-completion
-$ source $(brew --prefix)/etc/bash_completion
-$ source <(kubectl completion bash)
+		will load the kubectl completion code for bash. Note that this depends on the
+		bash-completion framework. It must be sourced before sourcing the kubectl
+		completion, e.g. on the Mac:
 
-If you use zsh, the following will load kubectl zsh completion:
+		    $ brew install bash-completion
+		    $ source $(brew --prefix)/etc/bash_completion
+		    $ source <(kubectl completion bash)
 
-$ source <(kubectl completion zsh)
-`
+		If you use zsh[1], the following will load kubectl zsh completion:
+
+		    $ source <(kubectl completion zsh)
+
+		[1] zsh completions are only supported in versions of zsh >= 5.2`)
 )
 
 var (
@@ -55,17 +57,16 @@ var (
 	}
 )
 
-func NewCmdCompletion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdCompletion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	shells := []string{}
 	for s := range completion_shells {
 		shells = append(shells, s)
 	}
 
 	cmd := &cobra.Command{
-		Use:     "completion SHELL",
-		Short:   "Output shell completion code for the given shell (bash or zsh)",
-		Long:    completion_long,
-		Example: completion_example,
+		Use:   "completion SHELL",
+		Short: "Output shell completion code for the given shell (bash or zsh)",
+		Long:  completion_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunCompletion(f, out, cmd, args)
 			cmdutil.CheckErr(err)
@@ -76,7 +77,7 @@ func NewCmdCompletion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunCompletion(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunCompletion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return cmdutil.UsageError(cmd, "Shell not specified.")
 	}
@@ -233,7 +234,6 @@ __kubectl_quote() {
     fi
 }
 
-autoload -U +X compinit && compinit
 autoload -U +X bashcompinit && bashcompinit
 
 # use word boundary patterns for BSD or GNU sed
@@ -244,7 +244,8 @@ if sed --help 2>&1 | grep -q GNU; then
 	RWORD='\>'
 fi
 
-__kubectl_bash_source <(sed \
+__kubectl_convert_bash_to_zsh() {
+	sed \
 	-e 's/declare -F/whence -w/' \
 	-e 's/local \([a-zA-Z0-9_]*\)=/local \1; \1=/' \
 	-e 's/flags+=("\(--.*\)=")/flags+=("\1"); two_word_flags+=("\1")/' \
@@ -266,7 +267,9 @@ __kubectl_bash_source <(sed \
 
 	zsh_tail := `
 BASH_COMPLETION_EOF
-)
+}
+
+__kubectl_bash_source <(__kubectl_convert_bash_to_zsh)
 `
 	out.Write([]byte(zsh_tail))
 	return nil

@@ -61,7 +61,7 @@ func (plugin *fcPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 		return "", err
 	}
 
-	//  TargetWWNs are the FibreChannel target world wide names
+	//  TargetWWNs are the FibreChannel target worldwide names
 	return fmt.Sprintf("%v", volumeSource.TargetWWNs), nil
 }
 
@@ -139,6 +139,16 @@ func (plugin *fcPlugin) newUnmounterInternal(volName string, podUID types.UID, m
 func (plugin *fcPlugin) execCommand(command string, args []string) ([]byte, error) {
 	cmd := plugin.exe.Command(command, args...)
 	return cmd.CombinedOutput()
+}
+
+func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	fcVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			FC: &api.FCVolumeSource{},
+		},
+	}
+	return volume.NewSpecFromVolume(fcVolume), nil
 }
 
 type fcDisk struct {

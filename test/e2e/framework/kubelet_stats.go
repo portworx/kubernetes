@@ -256,7 +256,7 @@ func getNodeRuntimeOperationErrorRate(c *client.Client, node string) (NodeRuntim
 }
 
 // HighLatencyKubeletOperations logs and counts the high latency metrics exported by the kubelet server via /metrics.
-func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nodeName string) (KubeletLatencyMetrics, error) {
+func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nodeName string, logFunc func(fmt string, args ...interface{})) (KubeletLatencyMetrics, error) {
 	ms, err := getKubeletMetrics(c, nodeName)
 	if err != nil {
 		return KubeletLatencyMetrics{}, err
@@ -264,7 +264,7 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 	latencyMetrics := GetKubeletLatencyMetrics(ms)
 	sort.Sort(latencyMetrics)
 	var badMetrics KubeletLatencyMetrics
-	Logf("\nLatency metrics for node %v", nodeName)
+	logFunc("\nLatency metrics for node %v", nodeName)
 	for _, m := range latencyMetrics {
 		if m.Latency > threshold {
 			badMetrics = append(badMetrics, m)
@@ -463,7 +463,6 @@ func TargetContainers() []string {
 		rootContainerName,
 		stats.SystemContainerRuntime,
 		stats.SystemContainerKubelet,
-		stats.SystemContainerMisc,
 	}
 }
 
@@ -488,7 +487,7 @@ type ResourceUsagePerNode map[string]ResourceUsagePerContainer
 func formatResourceUsageStats(nodeName string, containerStats ResourceUsagePerContainer) string {
 	// Example output:
 	//
-	// Resource usage for node "e2e-test-foo-minion-abcde":
+	// Resource usage for node "e2e-test-foo-node-abcde":
 	// container        cpu(cores)  memory(MB)
 	// "/"              0.363       2942.09
 	// "/docker-daemon" 0.088       521.80
@@ -794,7 +793,7 @@ type NodesCPUSummary map[string]ContainersCPUSummary
 
 func (r *ResourceMonitor) FormatCPUSummary(summary NodesCPUSummary) string {
 	// Example output for a node (the percentiles may differ):
-	// CPU usage of containers on node "e2e-test-foo-minion-0vj7":
+	// CPU usage of containers on node "e2e-test-foo-node-0vj7":
 	// container        5th%  50th% 90th% 95th%
 	// "/"              0.051 0.159 0.387 0.455
 	// "/runtime        0.000 0.000 0.146 0.166

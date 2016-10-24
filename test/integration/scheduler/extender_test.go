@@ -31,8 +31,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -79,11 +81,12 @@ func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Requ
 
 	if strings.Contains(req.URL.Path, filter) {
 		resp := &schedulerapi.ExtenderFilterResult{}
-		nodes, err := e.Filter(&args.Pod, &args.Nodes)
+		nodes, failedNodes, err := e.Filter(&args.Pod, &args.Nodes)
 		if err != nil {
 			resp.Error = err.Error()
 		} else {
 			resp.Nodes = *nodes
+			resp.FailedNodes = failedNodes
 		}
 
 		if err := encoder.Encode(resp); err != nil {
@@ -102,14 +105,15 @@ func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Requ
 	}
 }
 
-func (e *Extender) Filter(pod *api.Pod, nodes *api.NodeList) (*api.NodeList, error) {
+func (e *Extender) Filter(pod *api.Pod, nodes *api.NodeList) (*api.NodeList, schedulerapi.FailedNodesMap, error) {
 	filtered := []api.Node{}
+	failedNodesMap := schedulerapi.FailedNodesMap{}
 	for _, node := range nodes.Items {
 		fits := true
 		for _, predicate := range e.predicates {
 			fit, err := predicate(pod, &node)
 			if err != nil {
-				return &api.NodeList{}, err
+				return &api.NodeList{}, schedulerapi.FailedNodesMap{}, err
 			}
 			if !fit {
 				fits = false
@@ -118,9 +122,11 @@ func (e *Extender) Filter(pod *api.Pod, nodes *api.NodeList) (*api.NodeList, err
 		}
 		if fits {
 			filtered = append(filtered, node)
+		} else {
+			failedNodesMap[node.Name] = fmt.Sprintf("extender failed: %s", e.name)
 		}
 	}
-	return &api.NodeList{Items: filtered}, nil
+	return &api.NodeList{Items: filtered}, failedNodesMap, nil
 }
 
 func (e *Extender) Prioritize(pod *api.Pod, nodes *api.NodeList) (*schedulerapi.HostPriorityList, error) {
@@ -191,7 +197,8 @@ func TestSchedulerExtender(t *testing.T) {
 	ns := framework.CreateTestingNamespace("scheduler-extender", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	extender1 := &Extender{
 		name:         "extender1",
@@ -231,16 +238,16 @@ func TestSchedulerExtender(t *testing.T) {
 			},
 		},
 	}
-	policy.APIVersion = testapi.Default.GroupVersion().String()
+	policy.APIVersion = registered.GroupOrDie(api.GroupName).GroupVersion.String()
 
-	schedulerConfigFactory := factory.NewConfigFactory(restClient, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	schedulerConfigFactory := factory.NewConfigFactory(clientSet, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.CreateFromConfig(policy)
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(restClient.Events(ns.Name))
+	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: clientSet.Core().Events("")})
 	scheduler.New(schedulerConfig).Run()
 
 	defer close(schedulerConfig.StopEverything)

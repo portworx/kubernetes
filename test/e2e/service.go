@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -31,34 +32,40 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/service"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
-// Maximum time a kube-proxy daemon on a node is allowed to not
-// notice a Service update, such as type=NodePort.
-// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
-// liberal. Fix tracked in #20567.
-const kubeProxyLagTimeout = 5 * time.Minute
+const (
+	// Maximum time a kube-proxy daemon on a node is allowed to not
+	// notice a Service update, such as type=NodePort.
+	// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
+	// liberal. Fix tracked in #20567.
+	kubeProxyLagTimeout = 5 * time.Minute
 
-// Maximum time a load balancer is allowed to not respond after creation.
-const loadBalancerLagTimeoutDefault = 2 * time.Minute
+	// Maximum time a load balancer is allowed to not respond after creation.
+	loadBalancerLagTimeoutDefault = 2 * time.Minute
 
-// On AWS there is a delay between ELB creation and serving traffic;
-// a few minutes is typical, so use 10m.
-const loadBalancerLagTimeoutAWS = 10 * time.Minute
+	// On AWS there is a delay between ELB creation and serving traffic;
+	// a few minutes is typical, so use 10m.
+	loadBalancerLagTimeoutAWS = 10 * time.Minute
 
-// How long to wait for a load balancer to be created/modified.
-//TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
-const loadBalancerCreateTimeout = 20 * time.Minute
+	// How long to wait for a load balancer to be created/modified.
+	//TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
+	loadBalancerCreateTimeoutDefault = 20 * time.Minute
+	loadBalancerCreateTimeoutLarge   = time.Hour
+)
 
 // This should match whatever the default/configured range is
 var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
@@ -67,9 +74,11 @@ var _ = framework.KubeDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var c *client.Client
+	var cs clientset.Interface
 
 	BeforeEach(func() {
 		c = f.Client
+		cs = f.ClientSet
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
@@ -223,6 +232,58 @@ var _ = framework.KubeDescribe("Services", func() {
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 	})
 
+	// TODO: verify source IP preservation for LoadBalancer type services when applicable
+	It("should preserve source pod IP for traffic thru service cluster IP", func() {
+
+		serviceName := "sourceip-test"
+		ns := f.Namespace.Name
+
+		By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
+		jig := NewServiceTestJig(c, cs, serviceName)
+		servicePort := 8080
+		tcpService := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
+		jig.SanityCheckService(tcpService, api.ServiceTypeClusterIP)
+		defer func() {
+			framework.Logf("Cleaning up the sourceip test service")
+			err := c.Services(ns).Delete(serviceName)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+		serviceIp := tcpService.Spec.ClusterIP
+		framework.Logf("sourceip-test cluster ip: %s", serviceIp)
+
+		By("Picking multiple nodes")
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+
+		if len(nodes.Items) == 1 {
+			framework.Skipf("The test requires two Ready nodes on %s, but found just one.", framework.TestContext.Provider)
+		}
+
+		node1 := nodes.Items[0]
+		node2 := nodes.Items[1]
+
+		By("Creating a webserver pod be part of the TCP service which echoes back source ip")
+		serverPodName := "echoserver-sourceip"
+		jig.launchEchoserverPodOnNode(f, node1.Name, serverPodName)
+		defer func() {
+			framework.Logf("Cleaning up the echo server pod")
+			err := c.Pods(ns).Delete(serverPodName, nil)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+
+		// Waiting for service to expose endpoint.
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{serverPodName: {servicePort}})
+
+		By("Retrieve sourceip from a pod on the same node")
+		sourceIp1, execPodIp1 := execSourceipTest(f, c, ns, node1.Name, serviceIp, servicePort)
+		By("Verifying the preserved source ip")
+		Expect(sourceIp1).To(Equal(execPodIp1))
+
+		By("Retrieve sourceip from a pod on a different node")
+		sourceIp2, execPodIp2 := execSourceipTest(f, c, ns, node2.Name, serviceIp, servicePort)
+		By("Verifying the preserved source ip")
+		Expect(sourceIp2).To(Equal(execPodIp2))
+	})
+
 	It("should be able to up and down services", func() {
 		// TODO: use the ServiceTestJig here
 		// this test uses framework.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
@@ -237,7 +298,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
-		hosts, err := framework.NodeSSHHosts(c)
+		hosts, err := framework.NodeSSHHosts(f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -252,7 +313,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		// Stop service 1 and make sure it is gone.
 		By("stopping service1")
-		framework.ExpectNoError(stopServeHostnameService(c, ns, "service1"))
+		framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service1"))
 
 		By("verifying service1 is not up")
 		framework.ExpectNoError(verifyServeHostnameServiceDown(c, host, svc1IP, servicePort))
@@ -285,11 +346,11 @@ var _ = framework.KubeDescribe("Services", func() {
 		svc1 := "service1"
 		svc2 := "service2"
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, ns, svc1)) }()
+		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, svc1)) }()
 		podNames1, svc1IP, err := startServeHostnameService(c, ns, svc1, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, ns, svc2)) }()
+		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, svc2)) }()
 		podNames2, svc2IP, err := startServeHostnameService(c, ns, svc2, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -297,7 +358,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			framework.Failf("VIPs conflict: %v", svc1IP)
 		}
 
-		hosts, err := framework.NodeSSHHosts(c)
+		hosts, err := framework.NodeSSHHosts(f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -307,7 +368,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
 		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
 
-		By("Restarting kube-proxy")
+		By(fmt.Sprintf("Restarting kube-proxy on %v", host))
 		if err := framework.RestartKubeProxy(host); err != nil {
 			framework.Failf("error restarting kube-proxy: %v", err)
 		}
@@ -334,11 +395,11 @@ var _ = framework.KubeDescribe("Services", func() {
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, ns, "service1")) }()
+		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service1")) }()
 		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
-		hosts, err := framework.NodeSSHHosts(c)
+		hosts, err := framework.NodeSSHHosts(f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -348,16 +409,18 @@ var _ = framework.KubeDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
 
 		// Restart apiserver
+		By("Restarting apiserver")
 		if err := framework.RestartApiserver(c); err != nil {
 			framework.Failf("error restarting apiserver: %v", err)
 		}
+		By("Waiting for apiserver to come up by polling /healthz")
 		if err := framework.WaitForApiserverUp(c); err != nil {
 			framework.Failf("error while waiting for apiserver up: %v", err)
 		}
 		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
 
 		// Create a new service and check if it's not reusing IP.
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, ns, "service2")) }()
+		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service2")) }()
 		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -375,8 +438,8 @@ var _ = framework.KubeDescribe("Services", func() {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
-		jig := NewServiceTestJig(c, serviceName)
-		nodeIP := pickNodeIP(jig.Client) // for later
+		jig := NewServiceTestJig(c, cs, serviceName)
+		nodeIP := pickNodeIP(jig.ClientSet) // for later
 
 		By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
 		service := jig.CreateTCPServiceOrFail(ns, func(svc *api.Service) {
@@ -412,6 +475,11 @@ var _ = framework.KubeDescribe("Services", func() {
 		if framework.ProviderIs("aws") {
 			loadBalancerLagTimeout = loadBalancerLagTimeoutAWS
 		}
+		loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
+		largeClusterMinNodesNumber := 100
+		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > largeClusterMinNodesNumber {
+			loadBalancerCreateTimeout = loadBalancerCreateTimeoutLarge
+		}
 
 		// This test is more monolithic than we'd like because LB turnup can be
 		// very slow, so we lumped all the tests into one LB lifecycle.
@@ -426,8 +494,8 @@ var _ = framework.KubeDescribe("Services", func() {
 		ns2 := namespacePtr.Name // LB2 in ns2 on UDP
 		framework.Logf("namespace for UDP test: %s", ns2)
 
-		jig := NewServiceTestJig(c, serviceName)
-		nodeIP := pickNodeIP(jig.Client) // for later
+		jig := NewServiceTestJig(c, cs, serviceName)
+		nodeIP := pickNodeIP(jig.ClientSet) // for later
 
 		// Test TCP and UDP Services.  Services with the same name in different
 		// namespaces should get different node ports and load balancers.
@@ -514,7 +582,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
-		tcpService = jig.WaitForLoadBalancerOrFail(ns1, tcpService.Name)
+		tcpService = jig.WaitForLoadBalancerOrFail(ns1, tcpService.Name, loadBalancerCreateTimeout)
 		jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 		if int(tcpService.Spec.Ports[0].NodePort) != tcpNodePort {
 			framework.Failf("TCP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", tcpNodePort, tcpService.Spec.Ports[0].NodePort)
@@ -545,7 +613,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		if loadBalancerSupportsUDP {
 			By("waiting for the UDP service to have a load balancer")
 			// 2nd one should be faster since they ran in parallel.
-			udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name)
+			udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name, loadBalancerCreateTimeout)
 			jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
 			if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
 				framework.Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
@@ -687,7 +755,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			s.Spec.Ports[0].NodePort = 0
 		})
 		// Wait for the load balancer to be destroyed asynchronously
-		tcpService = jig.WaitForLoadBalancerDestroyOrFail(ns1, tcpService.Name, tcpIngressIP, svcPort)
+		tcpService = jig.WaitForLoadBalancerDestroyOrFail(ns1, tcpService.Name, tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 		jig.SanityCheckService(tcpService, api.ServiceTypeClusterIP)
 
 		By("changing UDP service back to type=ClusterIP")
@@ -697,7 +765,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		})
 		if loadBalancerSupportsUDP {
 			// Wait for the load balancer to be destroyed asynchronously
-			udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort)
+			udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 			jig.SanityCheckService(udpService, api.ServiceTypeClusterIP)
 		}
 
@@ -713,6 +781,53 @@ var _ = framework.KubeDescribe("Services", func() {
 		if loadBalancerSupportsUDP {
 			By("checking the UDP LoadBalancer is closed")
 			jig.TestNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		}
+	})
+
+	It("should use same NodePort with same port but different protocols", func() {
+		serviceName := "nodeports"
+		ns := f.Namespace.Name
+
+		t := NewServerTest(c, ns, serviceName)
+		defer func() {
+			defer GinkgoRecover()
+			errs := t.Cleanup()
+			if len(errs) != 0 {
+				framework.Failf("errors in cleanup: %v", errs)
+			}
+		}()
+
+		By("creating service " + serviceName + " with same NodePort but different protocols in namespace " + ns)
+		service := &api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name:      t.ServiceName,
+				Namespace: t.Namespace,
+			},
+			Spec: api.ServiceSpec{
+				Selector: t.Labels,
+				Type:     api.ServiceTypeNodePort,
+				Ports: []api.ServicePort{
+					{
+						Name:     "tcp-port",
+						Port:     53,
+						Protocol: api.ProtocolTCP,
+					},
+					{
+						Name:     "udp-port",
+						Port:     53,
+						Protocol: api.ProtocolUDP,
+					},
+				},
+			},
+		}
+		result, err := t.CreateService(service)
+		Expect(err).NotTo(HaveOccurred())
+
+		if len(result.Spec.Ports) != 2 {
+			framework.Failf("got unexpected len(Spec.Ports) for new service: %v", result)
+		}
+		if result.Spec.Ports[0].NodePort != result.Spec.Ports[1].NodePort {
+			framework.Failf("should use same NodePort for new service: %v", result)
 		}
 	})
 
@@ -958,6 +1073,81 @@ var _ = framework.KubeDescribe("Services", func() {
 			framework.Failf("expected un-ready endpoint for Service %v within %v, stdout: %v", t.name, kubeProxyLagTimeout, stdout)
 		}
 	})
+
+	It("should be able to create services of type LoadBalancer and externalTraffic=localOnly [Slow][Feature:ExternalTrafficLocalOnly]", func() {
+		// requires cloud load-balancer support - this feature currently supported only on GCE/GKE
+		framework.SkipUnlessProviderIs("gce", "gke")
+		loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
+
+		largeClusterMinNodesNumber := 100
+		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > largeClusterMinNodesNumber {
+			loadBalancerCreateTimeout = loadBalancerCreateTimeoutLarge
+		}
+		namespace := f.Namespace.Name
+		serviceName := "external-local"
+		jig := NewServiceTestJig(c, cs, serviceName)
+		By("creating a service " + namespace + "/" + namespace + " with type=LoadBalancer and annotation for local-traffic-only")
+		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *api.Service) {
+			svc.Spec.Type = api.ServiceTypeLoadBalancer
+			// We need to turn affinity off for our LB distribution tests
+			svc.Spec.SessionAffinity = api.ServiceAffinityNone
+			svc.ObjectMeta.Annotations = map[string]string{
+				service.AnnotationExternalTraffic: service.AnnotationValueExternalTrafficLocal}
+			svc.Spec.Ports = []api.ServicePort{{Protocol: "TCP", Port: 80}}
+		})
+		By("creating a pod to be part of the service " + serviceName)
+		// This container is an nginx container listening on port 80
+		// See kubernetes/contrib/ingress/echoheaders/nginx.conf for content of response
+		jig.RunOrFail(namespace, nil)
+		By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
+		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, loadBalancerCreateTimeout)
+		jig.SanityCheckService(svc, api.ServiceTypeLoadBalancer)
+		svcTcpPort := int(svc.Spec.Ports[0].Port)
+		framework.Logf("service port : %d", svcTcpPort)
+		ingressIP := getIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+		framework.Logf("TCP load balancer: %s", ingressIP)
+		healthCheckNodePort := int(service.GetServiceHealthCheckNodePort(svc))
+		By("checking health check node port allocated")
+		if healthCheckNodePort == 0 {
+			framework.Failf("Service HealthCheck NodePort was not allocated")
+		}
+		// TODO(33957): test localOnly nodePort Services.
+		By("hitting the TCP service's service port, via its external VIP " + ingressIP + ":" + fmt.Sprintf("%d", svcTcpPort))
+		jig.TestReachableHTTP(ingressIP, svcTcpPort, kubeProxyLagTimeout)
+		By("reading clientIP using the TCP service's service port via its external VIP")
+		content := jig.GetHTTPContent(ingressIP, svcTcpPort, kubeProxyLagTimeout, "/clientip")
+		clientIP := content.String()
+		framework.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
+		By("checking if Source IP is preserved")
+		if strings.HasPrefix(clientIP, "10.") {
+			framework.Failf("Source IP was NOT preserved")
+		}
+		By("finding nodes for all service endpoints")
+		endpoints, err := c.Endpoints(namespace).Get(serviceName)
+		if err != nil {
+			framework.Failf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
+		}
+		if len(endpoints.Subsets[0].Addresses) == 0 {
+			framework.Failf("Expected Ready endpoints - found none")
+		}
+		readyHostName := *endpoints.Subsets[0].Addresses[0].NodeName
+		framework.Logf("Pod for service %s/%s is on node %s", namespace, serviceName, readyHostName)
+		// HealthCheck responder validation - iterate over all node IPs and check their HC responses
+		// Collect all node names and their public IPs - the nodes and ips slices parallel each other
+		nodes := framework.GetReadySchedulableNodesOrDie(jig.ClientSet)
+		ips := collectAddresses(nodes, api.NodeExternalIP)
+		if len(ips) == 0 {
+			ips = collectAddresses(nodes, api.NodeLegacyHostIP)
+		}
+		By("checking kube-proxy health check responses are correct")
+		for n, publicIP := range ips {
+			framework.Logf("Checking health check response for node %s, public IP %s", nodes.Items[n].Name, publicIP)
+			// HealthCheck should pass only on the node where num(endpoints) > 0
+			// All other nodes should fail the healthcheck on the service healthCheckNodePort
+			expectedSuccess := nodes.Items[n].Name == readyHostName
+			jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, "/healthz", expectedSuccess)
+		}
+	})
 })
 
 // updateService fetches a service, calls the update function on it,
@@ -1092,11 +1282,8 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 	framework.Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, framework.ServiceStartTimeout)
 }
 
-// createExecPodOrFail creates a simple busybox pod in a sleep loop used as a
-// vessel for kubectl exec commands.
-// Returns the name of the created pod.
-func createExecPodOrFail(c *client.Client, ns, generateName string) string {
-	framework.Logf("Creating new exec pod")
+// newExecPodSpec returns the pod spec of exec pod
+func newExecPodSpec(ns, generateName string) *api.Pod {
 	immediate := int64(0)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -1114,10 +1301,38 @@ func createExecPodOrFail(c *client.Client, ns, generateName string) string {
 			},
 		},
 	}
-	created, err := c.Pods(ns).Create(pod)
+	return pod
+}
+
+// createExecPodOrFail creates a simple busybox pod in a sleep loop used as a
+// vessel for kubectl exec commands.
+// Returns the name of the created pod.
+func createExecPodOrFail(client *client.Client, ns, generateName string) string {
+	framework.Logf("Creating new exec pod")
+	execPod := newExecPodSpec(ns, generateName)
+	created, err := client.Pods(ns).Create(execPod)
 	Expect(err).NotTo(HaveOccurred())
 	err = wait.PollImmediate(framework.Poll, 5*time.Minute, func() (bool, error) {
-		retrievedPod, err := c.Pods(pod.Namespace).Get(created.Name)
+		retrievedPod, err := client.Pods(execPod.Namespace).Get(created.Name)
+		if err != nil {
+			return false, nil
+		}
+		return retrievedPod.Status.Phase == api.PodRunning, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
+	return created.Name
+}
+
+// createExecPodOnNode launches a exec pod in the given namespace and node
+// waits until it's Running, created pod name would be returned
+func createExecPodOnNode(client *client.Client, ns, nodeName, generateName string) string {
+	framework.Logf("Creating exec pod %q in namespace %q", generateName, ns)
+	execPod := newExecPodSpec(ns, generateName)
+	execPod.Spec.NodeName = nodeName
+	created, err := client.Pods(ns).Create(execPod)
+	Expect(err).NotTo(HaveOccurred())
+	err = wait.PollImmediate(framework.Poll, 5*time.Minute, func() (bool, error) {
+		retrievedPod, err := client.Pods(execPod.Namespace).Get(created.Name)
 		if err != nil {
 			return false, nil
 		}
@@ -1171,8 +1386,8 @@ func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []st
 	return ips
 }
 
-func getNodePublicIps(c *client.Client) ([]string, error) {
-	nodes := framework.GetReadySchedulableNodesOrDie(c)
+func getNodePublicIps(cs clientset.Interface) ([]string, error) {
+	nodes := framework.GetReadySchedulableNodesOrDie(cs)
 
 	ips := collectAddresses(nodes, api.NodeExternalIP)
 	if len(ips) == 0 {
@@ -1181,8 +1396,8 @@ func getNodePublicIps(c *client.Client) ([]string, error) {
 	return ips, nil
 }
 
-func pickNodeIP(c *client.Client) string {
-	publicIps, err := getNodePublicIps(c)
+func pickNodeIP(cs clientset.Interface) string {
+	publicIps, err := getNodePublicIps(cs)
 	Expect(err).NotTo(HaveOccurred())
 	if len(publicIps) == 0 {
 		framework.Failf("got unexpected number (%d) of public IPs", len(publicIps))
@@ -1192,6 +1407,10 @@ func pickNodeIP(c *client.Client) string {
 }
 
 func testReachableHTTP(ip string, port int, request string, expect string) (bool, error) {
+	return testReachableHTTPWithContent(ip, port, request, expect, nil)
+}
+
+func testReachableHTTPWithContent(ip string, port int, request string, expect string, content *bytes.Buffer) (bool, error) {
 	url := fmt.Sprintf("http://%s:%d%s", ip, port, request)
 	if ip == "" {
 		framework.Failf("Got empty IP for reachability check (%s)", url)
@@ -1216,13 +1435,44 @@ func testReachableHTTP(ip string, port int, request string, expect string) (bool
 		return false, nil
 	}
 	if resp.StatusCode != 200 {
-		return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s", resp.Status, url, string(body))
+		return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s",
+			resp.Status, url, string(body))
 	}
 	if !strings.Contains(string(body), expect) {
 		return false, fmt.Errorf("received response body without expected substring %q: %s", expect, string(body))
 	}
-	framework.Logf("Successfully reached %v", url)
+	if content != nil {
+		content.Write(body)
+	}
 	return true, nil
+}
+
+func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, error) {
+	url := fmt.Sprintf("http://%s:%d%s", ip, port, request)
+	if ip == "" || port == 0 {
+		framework.Failf("Got empty IP for reachability check (%s)", url)
+		return false, fmt.Errorf("Invalid input ip or port")
+	}
+	framework.Logf("Testing HTTP health check on %v", url)
+	resp, err := httpGetNoConnectionPool(url)
+	if err != nil {
+		framework.Logf("Got error testing for reachability of %s: %v", url, err)
+		return false, err
+	}
+	defer resp.Body.Close()
+	if err != nil {
+		framework.Logf("Got error reading response from %s: %v", url, err)
+		return false, err
+	}
+	// HealthCheck responder returns 503 for no local endpoints
+	if resp.StatusCode == 503 {
+		return false, nil
+	}
+	// HealthCheck responder returns 200 for non-zero local endpoints
+	if resp.StatusCode == 200 {
+		return true, nil
+	}
+	return false, fmt.Errorf("Unexpected HTTP response code %s from health check responder at %s", resp.Status, url)
 }
 
 func testNotReachableHTTP(ip string, port int) (bool, error) {
@@ -1357,7 +1607,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 
 	var createdPods []*api.Pod
 	maxContainerFailures := 0
-	config := framework.RCConfig{
+	config := testutils.RCConfig{
 		Client:               c,
 		Image:                "gcr.io/google_containers/serve_hostname:v1.4",
 		Name:                 name,
@@ -1393,8 +1643,8 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	return podNames, serviceIP, nil
 }
 
-func stopServeHostnameService(c *client.Client, ns, name string) error {
-	if err := framework.DeleteRC(c, ns, name); err != nil {
+func stopServeHostnameService(c *client.Client, clientset clientset.Interface, ns, name string) error {
+	if err := framework.DeleteRCAndPods(c, clientset, ns, name); err != nil {
 		return err
 	}
 	if err := c.Services(ns).Delete(name); err != nil {
@@ -1518,18 +1768,20 @@ func httpGetNoConnectionPool(url string) (*http.Response, error) {
 
 // A test jig to help testing.
 type ServiceTestJig struct {
-	ID     string
-	Name   string
-	Client *client.Client
-	Labels map[string]string
+	ID        string
+	Name      string
+	Client    *client.Client
+	ClientSet clientset.Interface
+	Labels    map[string]string
 }
 
 // NewServiceTestJig allocates and inits a new ServiceTestJig.
-func NewServiceTestJig(client *client.Client, name string) *ServiceTestJig {
+func NewServiceTestJig(client *client.Client, cs clientset.Interface, name string) *ServiceTestJig {
 	j := &ServiceTestJig{}
 	j.Client = client
+	j.ClientSet = cs
 	j.Name = name
-	j.ID = j.Name + "-" + string(util.NewUUID())
+	j.ID = j.Name + "-" + string(uuid.NewUUID())
 	j.Labels = map[string]string{"testid": j.ID}
 
 	return j
@@ -1537,8 +1789,8 @@ func NewServiceTestJig(client *client.Client, name string) *ServiceTestJig {
 
 // newServiceTemplate returns the default api.Service template for this jig, but
 // does not actually create the Service.  The default Service has the same name
-// as the jig and exposes port 80.
-func (j *ServiceTestJig) newServiceTemplate(namespace string, proto api.Protocol) *api.Service {
+// as the jig and exposes the given port.
+func (j *ServiceTestJig) newServiceTemplate(namespace string, proto api.Protocol, port int32) *api.Service {
 	service := &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: namespace,
@@ -1550,7 +1802,7 @@ func (j *ServiceTestJig) newServiceTemplate(namespace string, proto api.Protocol
 			Ports: []api.ServicePort{
 				{
 					Protocol: proto,
-					Port:     80,
+					Port:     port,
 				},
 			},
 		},
@@ -1558,11 +1810,26 @@ func (j *ServiceTestJig) newServiceTemplate(namespace string, proto api.Protocol
 	return service
 }
 
+// CreateTCPServiceWithPort creates a new TCP Service with given port based on the
+// jig's defaults. Callers can provide a function to tweak the Service object before
+// it is created.
+func (j *ServiceTestJig) CreateTCPServiceWithPort(namespace string, tweak func(svc *api.Service), port int32) *api.Service {
+	svc := j.newServiceTemplate(namespace, api.ProtocolTCP, port)
+	if tweak != nil {
+		tweak(svc)
+	}
+	result, err := j.Client.Services(namespace).Create(svc)
+	if err != nil {
+		framework.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
+	}
+	return result
+}
+
 // CreateTCPServiceOrFail creates a new TCP Service based on the jig's
 // defaults.  Callers can provide a function to tweak the Service object before
 // it is created.
 func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc *api.Service)) *api.Service {
-	svc := j.newServiceTemplate(namespace, api.ProtocolTCP)
+	svc := j.newServiceTemplate(namespace, api.ProtocolTCP, 80)
 	if tweak != nil {
 		tweak(svc)
 	}
@@ -1577,7 +1844,7 @@ func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc
 // defaults.  Callers can provide a function to tweak the Service object before
 // it is created.
 func (j *ServiceTestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc *api.Service)) *api.Service {
-	svc := j.newServiceTemplate(namespace, api.ProtocolUDP)
+	svc := j.newServiceTemplate(namespace, api.ProtocolUDP, 80)
 	if tweak != nil {
 		tweak(svc)
 	}
@@ -1680,9 +1947,9 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 	return service
 }
 
-func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string) *api.Service {
+func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time.Duration) *api.Service {
 	var service *api.Service
-	framework.Logf("Waiting up to %v for service %q to have a LoadBalancer", loadBalancerCreateTimeout, name)
+	framework.Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.Services(namespace).Get(name)
 		if err != nil {
@@ -1694,13 +1961,13 @@ func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string) *api.
 		}
 		return false, nil
 	}
-	if err := wait.PollImmediate(framework.Poll, loadBalancerCreateTimeout, pollFunc); err != nil {
+	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
 		framework.Failf("Timeout waiting for service %q to have a load balancer", name)
 	}
 	return service
 }
 
-func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip string, port int) *api.Service {
+func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip string, port int, timeout time.Duration) *api.Service {
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	defer func() {
 		if err := framework.EnsureLoadBalancerResourcesDeleted(ip, strconv.Itoa(port)); err != nil {
@@ -1709,7 +1976,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 	}()
 
 	var service *api.Service
-	framework.Logf("Waiting up to %v for service %q to have no LoadBalancer", loadBalancerCreateTimeout, name)
+	framework.Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.Services(namespace).Get(name)
 		if err != nil {
@@ -1721,7 +1988,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 		}
 		return false, nil
 	}
-	if err := wait.PollImmediate(framework.Poll, loadBalancerCreateTimeout, pollFunc); err != nil {
+	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
 		framework.Failf("Timeout waiting for service %q to have no load balancer", name)
 	}
 	return service
@@ -1749,6 +2016,29 @@ func (j *ServiceTestJig) TestNotReachableUDP(host string, port int, timeout time
 	if err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) { return testNotReachableUDP(host, port, "echo hello") }); err != nil {
 		framework.Failf("Could still reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
+}
+
+func (j *ServiceTestJig) GetHTTPContent(host string, port int, timeout time.Duration, url string) bytes.Buffer {
+	var body bytes.Buffer
+	if err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) { return testReachableHTTPWithContent(host, port, url, "", &body) }); err != nil {
+		framework.Failf("Could not reach HTTP service through %v:%v/%v after %v: %v", host, port, url, timeout, err)
+		return body
+	}
+	return body
+}
+
+func (j *ServiceTestJig) TestHTTPHealthCheckNodePort(host string, port int, request string, expectedSuccess bool) {
+	success, err := testHTTPHealthCheckNodePort(host, port, request)
+	if expectedSuccess && success {
+		framework.Logf("HealthCheck successful for node %v:%v, as expected", host, port)
+		return
+	} else if !expectedSuccess && (!success || err != nil) {
+		framework.Logf("HealthCheck failed for node %v:%v, as expected", host, port)
+		return
+	} else if expectedSuccess {
+		framework.Failf("HealthCheck NodePort incorrectly reporting unhealthy on %v:%v: %v", host, port, err)
+	}
+	framework.Failf("Unexpected HealthCheck NodePort still reporting healthy %v:%v: %v", host, port, err)
 }
 
 func getIngressPoint(ing *api.LoadBalancerIngress) string {
@@ -1780,7 +2070,7 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *api.ReplicationControl
 					Containers: []api.Container{
 						{
 							Name:  "netexec",
-							Image: "gcr.io/google_containers/netexec:1.4",
+							Image: "gcr.io/google_containers/netexec:1.7",
 							Args:  []string{"--http-port=80", "--udp-port=80"},
 							ReadinessProbe: &api.Probe{
 								PeriodSeconds: 3,
@@ -1879,7 +2169,7 @@ func NewServerTest(client *client.Client, namespace string, serviceName string) 
 	t.Client = client
 	t.Namespace = namespace
 	t.ServiceName = serviceName
-	t.TestId = t.ServiceName + "-" + string(util.NewUUID())
+	t.TestId = t.ServiceName + "-" + string(uuid.NewUUID())
 	t.Labels = map[string]string{
 		"testid": t.TestId,
 	}
@@ -1968,7 +2258,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 		// TODO(mikedanese): Wait.
 
 		// Then, delete the RC altogether.
-		if err := t.Client.ReplicationControllers(t.Namespace).Delete(rcName); err != nil {
+		if err := t.Client.ReplicationControllers(t.Namespace).Delete(rcName, nil); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -1982,4 +2272,89 @@ func (t *ServiceTestFixture) Cleanup() []error {
 	}
 
 	return errs
+}
+
+// newEchoServerPodSpec returns the pod spec of echo server pod
+func newEchoServerPodSpec(podName string) *api.Pod {
+	port := 8080
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: podName,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "echoserver",
+					Image: "gcr.io/google_containers/echoserver:1.4",
+					Ports: []api.ContainerPort{{ContainerPort: int32(port)}},
+				},
+			},
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+	return pod
+}
+
+// launchEchoserverPodOnNode launches a pod serving http on port 8080 to act
+// as the target for source IP preservation test. The client's source ip would
+// be echoed back by the web server.
+func (j *ServiceTestJig) launchEchoserverPodOnNode(f *framework.Framework, nodeName, podName string) {
+	framework.Logf("Creating echo server pod %q in namespace %q", podName, f.Namespace.Name)
+	pod := newEchoServerPodSpec(podName)
+	pod.Spec.NodeName = nodeName
+	pod.ObjectMeta.Labels = j.Labels
+	podClient := f.Client.Pods(f.Namespace.Name)
+	_, err := podClient.Create(pod)
+	framework.ExpectNoError(err)
+	framework.ExpectNoError(f.WaitForPodRunning(podName))
+	framework.Logf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name)
+}
+
+func execSourceipTest(f *framework.Framework, c *client.Client, ns, nodeName, serviceIp string, servicePort int) (string, string) {
+	framework.Logf("Creating an exec pod on the same node")
+	execPodName := createExecPodOnNode(f.Client, ns, nodeName, fmt.Sprintf("execpod-sourceip-%s", nodeName))
+	defer func() {
+		framework.Logf("Cleaning up the exec pod")
+		err := c.Pods(ns).Delete(execPodName, nil)
+		Expect(err).NotTo(HaveOccurred())
+	}()
+	podClient := f.Client.Pods(ns)
+	execPod, err := podClient.Get(execPodName)
+	ExpectNoError(err)
+	execPodIp := execPod.Status.PodIP
+	framework.Logf("Exec pod ip: %s", execPodIp)
+
+	framework.Logf("Getting echo response from service")
+	var stdout string
+	timeout := 2 * time.Minute
+	framework.Logf("Waiting up to %v for sourceIp test to be executed", timeout)
+	cmd := fmt.Sprintf(`wget -T 30 -qO- %s:%d | grep client_address`, serviceIp, servicePort)
+	// Need timeout mechanism because it may takes more times for iptables to be populated.
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2) {
+		stdout, err = framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		if err != nil {
+			framework.Logf("got err: %v, retry until timeout", err)
+			continue
+		}
+		// Need to check output because wget -q might omit the error.
+		if strings.TrimSpace(stdout) == "" {
+			framework.Logf("got empty stdout, retry until timeout")
+			continue
+		}
+		break
+	}
+
+	ExpectNoError(err)
+
+	// The stdout return from RunHostCmd seems to come with "\n", so TrimSpace is needed.
+	// Desired stdout in this format: client_address=x.x.x.x
+	outputs := strings.Split(strings.TrimSpace(stdout), "=")
+	sourceIp := ""
+	if len(outputs) != 2 {
+		// Fail the test if output format is unexpected.
+		framework.Failf("exec pod returned unexpected stdout format: [%v]\n", stdout)
+	} else {
+		sourceIp = outputs[1]
+	}
+	return execPodIp, sourceIp
 }

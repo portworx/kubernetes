@@ -39,10 +39,11 @@ import (
 
 type KubeDNSServer struct {
 	// DNS domain name.
-	domain      string
-	healthzPort int
-	dnsPort     int
-	kd          *kdns.KubeDNS
+	domain         string
+	healthzPort    int
+	dnsBindAddress string
+	dnsPort        int
+	kd             *kdns.KubeDNS
 }
 
 func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
@@ -55,6 +56,7 @@ func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
 		glog.Fatalf("Failed to create a kubernetes client: %v", err)
 	}
 	ks.healthzPort = config.HealthzPort
+	ks.dnsBindAddress = config.DNSBindAddress
 	ks.dnsPort = config.DNSPort
 	ks.kd, err = kdns.NewKubeDNS(kubeClient, config.ClusterDomain, config.Federations)
 	if err != nil {
@@ -91,8 +93,7 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error
 		}
 	}
 
-	glog.Infof("Using %s for kubernetes master", config.Host)
-	glog.Infof("Using kubernetes API %v", config.GroupVersion)
+	glog.Infof("Using %s for kubernetes master, kubernetes API: %v", config.Host, config.GroupVersion)
 	return clientset.NewForConfig(config)
 }
 
@@ -126,24 +127,24 @@ func (server *KubeDNSServer) setupHealthzHandlers() {
 }
 
 // setupSignalHandlers runs a goroutine that waits on SIGINT or SIGTERM and logs it
-// before exiting.
+// program will be terminated by SIGKILL when grace period ends.
 func setupSignalHandlers() {
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		glog.Fatalf("Received signal: %s", <-sigChan)
+		glog.Infof("Received signal: %s, will exit when the grace period ends", <-sigChan)
 	}()
 }
 
 func (d *KubeDNSServer) startSkyDNSServer() {
-	glog.Infof("Starting SkyDNS server. Listening on port:%d", d.dnsPort)
-	skydnsConfig := &server.Config{Domain: d.domain, DnsAddr: fmt.Sprintf("0.0.0.0:%d", d.dnsPort)}
+	glog.Infof("Starting SkyDNS server. Listening on %s:%d", d.dnsBindAddress, d.dnsPort)
+	skydnsConfig := &server.Config{Domain: d.domain, DnsAddr: fmt.Sprintf("%s:%d", d.dnsBindAddress, d.dnsPort)}
 	server.SetDefaults(skydnsConfig)
 	s := server.New(d.kd, skydnsConfig)
 	if err := metrics.Metrics(); err != nil {
 		glog.Fatalf("skydns: %s", err)
-	} else {
-		glog.Infof("skydns: metrics enabled on :%s%s", metrics.Port, metrics.Path)
 	}
+	glog.Infof("skydns: metrics enabled on : %s:%s", metrics.Path, metrics.Port)
+
 	go s.Run()
 }

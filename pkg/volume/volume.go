@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // Volume represents a directory used by pods or hosts on a node. All method
@@ -41,7 +42,7 @@ type Volume interface {
 // MetricsProvider exposes metrics (e.g. used,available space) related to a
 // Volume.
 type MetricsProvider interface {
-	// GetMetrics returns the Metrics for the Volume.  Maybe expensive for
+	// GetMetrics returns the Metrics for the Volume. Maybe expensive for
 	// some implementations.
 	GetMetrics() (*Metrics, error)
 }
@@ -107,9 +108,9 @@ type Unmounter interface {
 // Recycler provides methods to reclaim the volume resource.
 type Recycler interface {
 	Volume
-	// Recycle reclaims the resource.  Calls to this method should block until
+	// Recycle reclaims the resource. Calls to this method should block until
 	// the recycling task is complete. Any error returned indicates the volume
-	// has failed to be reclaimed.  A nil return indicates success.
+	// has failed to be reclaimed. A nil return indicates success.
 	Recycle() error
 }
 
@@ -122,22 +123,28 @@ type Provisioner interface {
 	Provision() (*api.PersistentVolume, error)
 }
 
-// Deleter removes the resource from the underlying storage provider.  Calls
+// Deleter removes the resource from the underlying storage provider. Calls
 // to this method should block until the deletion is complete. Any error
 // returned indicates the volume has failed to be reclaimed. A nil return
 // indicates success.
 type Deleter interface {
 	Volume
 	// This method should block until completion.
+	// deletedVolumeInUseError returned from this function will not be reported
+	// as error and it will be sent as "Info" event to the PV being deleted. The
+	// volume controller will retry deleting the volume in the next periodic
+	// sync. This can be used to postpone deletion of a volume that is being
+	// dettached from a node. Deletion of such volume would fail anyway and such
+	// error would confuse users.
 	Delete() error
 }
 
 // Attacher can attach a volume to a node.
 type Attacher interface {
-	// Attaches the volume specified by the given spec to the given host.
-	// On success, returns the device path where the device was attache don the
+	// Attaches the volume specified by the given spec to the node with the given Name.
+	// On success, returns the device path where the device was attached on the
 	// node.
-	Attach(spec *Spec, hostName string) (string, error)
+	Attach(spec *Spec, nodeName types.NodeName) (string, error)
 
 	// WaitForAttach blocks until the device is attached to this
 	// node. If it successfully attaches, the path to the device
@@ -157,8 +164,8 @@ type Attacher interface {
 
 // Detacher can detach a volume from a node.
 type Detacher interface {
-	// Detach the given device from the given host.
-	Detach(deviceName, hostName string) error
+	// Detach the given device from the node with the given Name.
+	Detach(deviceName string, nodeName types.NodeName) error
 
 	// WaitForDetach blocks until the device is detached from this
 	// node. If the device does not detach within the given timeout
@@ -169,6 +176,31 @@ type Detacher interface {
 	// should only be called once all bind mounts have been
 	// unmounted.
 	UnmountDevice(deviceMountPath string) error
+}
+
+// NewDeletedVolumeInUseError returns a new instance of DeletedVolumeInUseError
+// error.
+func NewDeletedVolumeInUseError(message string) error {
+	return deletedVolumeInUseError(message)
+}
+
+type deletedVolumeInUseError string
+
+var _ error = deletedVolumeInUseError("")
+
+// IsDeletedVolumeInUse returns true if an error returned from Delete() is
+// deletedVolumeInUseError
+func IsDeletedVolumeInUse(err error) bool {
+	switch err.(type) {
+	case deletedVolumeInUseError:
+		return true
+	default:
+		return false
+	}
+}
+
+func (err deletedVolumeInUseError) Error() string {
+	return string(err)
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {

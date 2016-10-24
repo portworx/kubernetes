@@ -17,28 +17,46 @@ limitations under the License.
 package e2e_node
 
 import (
+	"encoding/json"
 	"flag"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strings"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 )
 
+// TODO(random-liu): Get this automatically from kubelet flag.
 var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "Host and port of the kubelet")
-var apiServerAddress = flag.String("api-server-address", "http://127.0.0.1:8080", "Host and port of the api server")
 
-var disableKubenet = flag.Bool("disable-kubenet", false, "If true, start kubelet without kubenet")
-var buildServices = flag.Bool("build-services", true, "If true, build local executables")
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 
-func NewDefaultFramework(baseName string) *framework.Framework {
-	// Provides a client config for the framework to create a client.
-	f := func() (*restclient.Config, error) {
-		return &restclient.Config{Host: *apiServerAddress}, nil
+func getNodeSummary() (*stats.Summary, error) {
+	req, err := http.NewRequest("GET", *kubeletAddress+"/stats/summary", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build http request: %v", err)
 	}
-	return framework.NewFrameworkWithConfigGetter(baseName,
-		framework.FrameworkOptions{
-			ClientQPS:   100,
-			ClientBurst: 100,
-		}, nil, f)
+	req.Header.Add("Accept", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get /stats/summary: %v", err)
+	}
+
+	defer resp.Body.Close()
+	contentsBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read /stats/summary: %+v", resp)
+	}
+
+	decoder := json.NewDecoder(strings.NewReader(string(contentsBytes)))
+	summary := stats.Summary{}
+	err = decoder.Decode(&summary)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)
+	}
+	return &summary, nil
 }

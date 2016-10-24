@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.
@@ -39,7 +40,7 @@ func TestDeleteSync(t *testing.T) {
 			noevents, noerrors,
 			// Inject deleter into the controller and call syncVolume. The
 			// deleter simulates one delete() call that succeeds.
-			wrapTestWithControllerConfig(operationDelete, []error{nil}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationDelete, []error{nil}, testSyncVolume),
 		},
 		{
 			// delete volume bound by user
@@ -51,7 +52,7 @@ func TestDeleteSync(t *testing.T) {
 			noevents, noerrors,
 			// Inject deleter into the controller and call syncVolume. The
 			// deleter simulates one delete() call that succeeds.
-			wrapTestWithControllerConfig(operationDelete, []error{nil}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationDelete, []error{nil}, testSyncVolume),
 		},
 		{
 			// delete failure - plugin not found
@@ -70,17 +71,17 @@ func TestDeleteSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors,
-			wrapTestWithControllerConfig(operationDelete, []error{}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume),
 		},
 		{
 			// delete failure - delete() returns error
 			"8-5 - delete returns error",
 			newVolumeArray("volume8-5", "1Gi", "uid8-5", "claim8-5", api.VolumeBound, api.PersistentVolumeReclaimDelete),
-			withMessage("Delete of volume \"volume8-5\" failed: Mock delete error", newVolumeArray("volume8-5", "1Gi", "uid8-5", "claim8-5", api.VolumeFailed, api.PersistentVolumeReclaimDelete)),
+			withMessage("Mock delete error", newVolumeArray("volume8-5", "1Gi", "uid8-5", "claim8-5", api.VolumeFailed, api.PersistentVolumeReclaimDelete)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors,
-			wrapTestWithControllerConfig(operationDelete, []error{errors.New("Mock delete error")}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationDelete, []error{errors.New("Mock delete error")}, testSyncVolume),
 		},
 		{
 			// delete success(?) - volume is deleted before doDelete() starts
@@ -90,7 +91,7 @@ func TestDeleteSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				// Delete the volume before delete operation starts
 				reactor.lock.Lock()
 				delete(reactor.volumes, "volume8-6")
@@ -107,7 +108,7 @@ func TestDeleteSync(t *testing.T) {
 			noclaims,
 			newClaimArray("claim8-7", "uid8-7", "10Gi", "volume8-7", api.ClaimBound),
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				reactor.lock.Lock()
 				defer reactor.lock.Unlock()
 				// Bind the volume to resurrected claim (this should never
@@ -130,10 +131,25 @@ func TestDeleteSync(t *testing.T) {
 			noevents, noerrors,
 			// Inject deleter into the controller and call syncVolume. The
 			// deleter simulates one delete() call that succeeds.
-			wrapTestWithControllerConfig(operationDelete, []error{nil}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationDelete, []error{nil}, testSyncVolume),
+		},
+		{
+			// PV requires external deleter
+			"8-10 - external deleter",
+			newVolumeArray("volume8-10", "1Gi", "uid10-1", "claim10-1", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController),
+			newVolumeArray("volume8-10", "1Gi", "uid10-1", "claim10-1", api.VolumeReleased, api.PersistentVolumeReclaimDelete, annBoundByController),
+			noclaims,
+			noclaims,
+			noevents, noerrors,
+			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+				// Inject external deleter annotation
+				test.initialVolumes[0].Annotations[annDynamicallyProvisioned] = "external.io/test"
+				test.expectedVolumes[0].Annotations[annDynamicallyProvisioned] = "external.io/test"
+				return testSyncVolume(ctrl, reactor, test)
+			},
 		},
 	}
-	runSyncTests(t, tests)
+	runSyncTests(t, tests, []*storage.StorageClass{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
@@ -161,9 +177,9 @@ func TestDeleteMultiSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors,
-			wrapTestWithControllerConfig(operationDelete, []error{errors.New("Mock delete error"), nil}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationDelete, []error{errors.New("Mock delete error"), nil}, testSyncVolume),
 		},
 	}
 
-	runMultisyncTests(t, tests)
+	runMultisyncTests(t, tests, []*storage.StorageClass{}, "")
 }

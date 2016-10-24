@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/design/service_accounts.md).
+[here](http://releases.k8s.io/release-1.4/docs/design/service_accounts.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -113,9 +113,9 @@ system external to Kubernetes.
 
 Kubernetes does not dictate how to divide up the space of user identifier
 strings. User names can be simple Unix-style short usernames, (e.g. `alice`), or
-may be qualified to allow for federated identity (`alice@example.com` vs
+may be qualified to allow for federated identity (`alice@example.com` vs.
 `alice@example.org`.) Naming convention may distinguish service accounts from
-user accounts (e.g. `alice@example.com` vs
+user accounts (e.g. `alice@example.com` vs.
 `build-service-account-a3b7f0@foo-namespace.service-accounts.example.com`), but
 Kubernetes does not require this.
 

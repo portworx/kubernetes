@@ -25,8 +25,10 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -91,17 +93,6 @@ type Runtime interface {
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visble in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
-	// PullImage pulls an image from the network to local storage using the supplied
-	// secrets if necessary.
-	PullImage(image ImageSpec, pullSecrets []api.Secret) error
-	// IsImagePresent checks whether the container image is already in the local storage.
-	IsImagePresent(image ImageSpec) (bool, error)
-	// Gets all images currently on the machine.
-	ListImages() ([]Image, error)
-	// Removes the specified image.
-	RemoveImage(image ImageSpec) error
-	// Returns Image statistics.
-	ImageStats() (*ImageStats, error)
 	// Returns the filesystem path of the pod's network namespace; if the
 	// runtime does not handle namespace creation itself, or cannot return
 	// the network namespace path, it should return an error.
@@ -109,7 +100,7 @@ type Runtime interface {
 	// by all containers in the pod.
 	GetNetNS(containerID ContainerID) (string, error)
 	// Returns the container ID that represents the Pod, as passed to network
-	// plugins. For example if the runtime uses an infra container, returns
+	// plugins. For example, if the runtime uses an infra container, returns
 	// the infra container's ContainerID.
 	// TODO: Change ContainerID to a Pod ID, see GetNetNS()
 	GetPodContainerID(*Pod) (ContainerID, error)
@@ -125,10 +116,26 @@ type Runtime interface {
 	ContainerCommandRunner
 	// ContainerAttach encapsulates the attaching to containers for testability
 	ContainerAttacher
+	// ImageService provides methods to image-related methods.
+	ImageService
+}
+
+type ImageService interface {
+	// PullImage pulls an image from the network to local storage using the supplied
+	// secrets if necessary.
+	PullImage(image ImageSpec, pullSecrets []api.Secret) error
+	// IsImagePresent checks whether the container image is already in the local storage.
+	IsImagePresent(image ImageSpec) (bool, error)
+	// Gets all images currently on the machine.
+	ListImages() ([]Image, error)
+	// Removes the specified image.
+	RemoveImage(image ImageSpec) error
+	// Returns Image statistics.
+	ImageStats() (*ImageStats, error)
 }
 
 type ContainerAttacher interface {
-	AttachContainer(id ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) (err error)
+	AttachContainer(id ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error)
 }
 
 // CommandRunner encapsulates the command runner interfaces for testability.
@@ -136,16 +143,9 @@ type ContainerCommandRunner interface {
 	// Runs the command in the container of the specified pod using nsenter.
 	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
 	// tty.
-	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
+	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error
 	// Forward the specified port from the specified pod to the stream.
 	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
-}
-
-// ImagePuller wraps Runtime.PullImage() to pull a container image.
-// It will check the presence of the image, and report the 'image pulling',
-// 'image pulled' events correspondingly.
-type ImagePuller interface {
-	PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
 }
 
 // Pod is a group of containers.
@@ -159,6 +159,11 @@ type Pod struct {
 	// List of containers that belongs to this pod. It may contain only
 	// running containers, or mixed with dead ones (when GetPods(true)).
 	Containers []*Container
+	// List of sandboxes associated with this pod. The sandboxes are converted
+	// to Container temporariliy to avoid substantial changes to other
+	// components. This is only populated by kuberuntime.
+	// TODO: use the runtimeApi.PodSandbox type directly.
+	Sandboxes []*Container
 }
 
 // PodPair contains both runtime#Pod and api#Pod
@@ -231,12 +236,11 @@ func (id DockerID) ContainerID() ContainerID {
 type ContainerState string
 
 const (
+	ContainerStateCreated ContainerState = "created"
 	ContainerStateRunning ContainerState = "running"
 	ContainerStateExited  ContainerState = "exited"
 	// This unknown encompasses all the states that we currently don't care.
 	ContainerStateUnknown ContainerState = "unknown"
-	// Not in use yet.
-	ContainerStateCreated ContainerState = "created"
 )
 
 // Container provides the runtime information for a container, such as ID, hash,
@@ -251,6 +255,8 @@ type Container struct {
 	// The image name of the container, this also includes the tag of the image,
 	// the expected form is "NAME:TAG".
 	Image string
+	// The id of the image used by the container.
+	ImageID string
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
 	Hash uint64
@@ -271,6 +277,9 @@ type PodStatus struct {
 	IP string
 	// Status of containers in the pod.
 	ContainerStatuses []*ContainerStatus
+	// Status of the pod sandbox.
+	// Only for kuberuntime now, other runtime may keep it nil.
+	SandboxStatuses []*runtimeApi.PodSandboxStatus
 }
 
 // ContainerStatus represents the status of a container.
@@ -346,6 +355,8 @@ type EnvVar struct {
 
 type Mount struct {
 	// Name of the volume mount.
+	// TODO(yifan): Remove this field, as this is not representing the unique name of the mount,
+	// but the volume name only.
 	Name string
 	// Path of the mount within the container.
 	ContainerPath string
@@ -455,6 +466,15 @@ func (p *Pod) FindContainerByName(containerName string) *Container {
 
 func (p *Pod) FindContainerByID(id ContainerID) *Container {
 	for _, c := range p.Containers {
+		if c.ID == id {
+			return c
+		}
+	}
+	return nil
+}
+
+func (p *Pod) FindSandboxByID(id ContainerID) *Container {
+	for _, c := range p.Sandboxes {
 		if c.ID == id {
 			return c
 		}

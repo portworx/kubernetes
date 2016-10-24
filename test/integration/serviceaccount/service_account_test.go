@@ -33,7 +33,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -41,7 +41,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -237,12 +236,14 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 	}
 
 	// Pod we expect to get created
+	defaultMode := int32(0644)
 	expectedServiceAccount := serviceaccountadmission.DefaultServiceAccountName
 	expectedVolumes := append(protoPod.Spec.Volumes, api.Volume{
 		Name: defaultTokenName,
 		VolumeSource: api.VolumeSource{
 			Secret: &api.SecretVolumeSource{
-				SecretName: defaultTokenName,
+				SecretName:  defaultTokenName,
+				DefaultMode: &defaultMode,
 			},
 		},
 	})
@@ -338,16 +339,17 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 // It is the responsibility of the caller to ensure the returned stopFunc is called
 func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclient.Config, func()) {
 	// Listener
-	var m *master.Master
+	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
+		<-h.Initialized
+		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
 	// Anonymous client config
-	clientConfig := restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+	clientConfig := restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 	// Root client
 	// TODO: remove rootClient after we refactor pkg/admission to use the clientset.
-	rootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, BearerToken: rootToken})
+	rootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}, BearerToken: rootToken})
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user
 	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
@@ -359,7 +361,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	})
 	serviceAccountKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	serviceAccountTokenGetter := serviceaccountcontroller.NewGetterFromClient(rootClientset)
-	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]*rsa.PublicKey{&serviceAccountKey.PublicKey}, true, serviceAccountTokenGetter)
+	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]interface{}{&serviceAccountKey.PublicKey}, true, serviceAccountTokenGetter)
 	authenticator := union.New(
 		bearertoken.New(rootTokenAuth),
 		bearertoken.New(serviceAccountTokenAuth),
@@ -369,14 +371,17 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// 1. The "root" user is allowed to do anything
 	// 2. ServiceAccounts named "ro" are allowed read-only operations in their namespace
 	// 3. ServiceAccounts named "rw" are allowed any operation in their namespace
-	authorizer := authorizer.AuthorizerFunc(func(attrs authorizer.Attributes) error {
-		username := attrs.GetUserName()
+	authorizer := authorizer.AuthorizerFunc(func(attrs authorizer.Attributes) (bool, string, error) {
+		username := ""
+		if user := attrs.GetUser(); user != nil {
+			username = user.GetName()
+		}
 		ns := attrs.GetNamespace()
 
 		// If the user is "root"...
 		if username == rootUserName {
 			// allow them to do anything
-			return nil
+			return true, "", nil
 		}
 
 		// If the user is a service account...
@@ -386,31 +391,26 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 				switch serviceAccountName {
 				case readOnlyServiceAccountName:
 					if attrs.IsReadOnly() {
-						return nil
+						return true, "", nil
 					}
 				case readWriteServiceAccountName:
-					return nil
+					return true, "", nil
 				}
 			}
 		}
 
-		return fmt.Errorf("User %s is denied (ns=%s, readonly=%v, resource=%s)", username, ns, attrs.IsReadOnly(), attrs.GetResource())
+		return false, fmt.Sprintf("User %s is denied (ns=%s, readonly=%v, resource=%s)", username, ns, attrs.IsReadOnly(), attrs.GetResource()), nil
 	})
 
 	// Set up admission plugin to auto-assign serviceaccounts to pods
 	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount(rootClientset)
 
 	masterConfig := framework.NewMasterConfig()
-	masterConfig.EnableIndex = true
-	masterConfig.Authenticator = authenticator
-	masterConfig.Authorizer = authorizer
-	masterConfig.AdmissionControl = serviceAccountAdmission
-
-	// Create a master and install handlers into mux.
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
+	masterConfig.GenericConfig.EnableIndex = true
+	masterConfig.GenericConfig.Authenticator = authenticator
+	masterConfig.GenericConfig.Authorizer = authorizer
+	masterConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
+	framework.RunAMasterUsingServer(masterConfig, apiServer, h)
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})

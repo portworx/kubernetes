@@ -25,6 +25,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -302,9 +303,9 @@ func (rc *ResourceConsumer) CleanUp() {
 	rc.stopCustomMetric <- 0
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
-	framework.ExpectNoError(framework.DeleteRC(rc.framework.Client, rc.framework.Namespace.Name, rc.name))
+	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.Client, rc.framework.ClientSet, rc.framework.Namespace.Name, rc.name))
 	framework.ExpectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.name))
-	framework.ExpectNoError(framework.DeleteRC(rc.framework.Client, rc.framework.Namespace.Name, rc.controllerName))
+	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.Client, rc.framework.ClientSet, rc.framework.Namespace.Name, rc.controllerName))
 	framework.ExpectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.controllerName))
 }
 
@@ -327,7 +328,7 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 	})
 	framework.ExpectNoError(err)
 
-	rcConfig := framework.RCConfig{
+	rcConfig := testutils.RCConfig{
 		Client:     c,
 		Image:      resourceConsumerImage,
 		Name:       name,
@@ -345,15 +346,16 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 		framework.ExpectNoError(framework.RunRC(rcConfig))
 		break
 	case kindDeployment:
-		dpConfig := framework.DeploymentConfig{
+		dpConfig := testutils.DeploymentConfig{
 			RCConfig: rcConfig,
 		}
 		framework.ExpectNoError(framework.RunDeployment(dpConfig))
 		break
 	case kindReplicaSet:
-		rsConfig := framework.ReplicaSetConfig{
+		rsConfig := testutils.ReplicaSetConfig{
 			RCConfig: rcConfig,
 		}
+		By(fmt.Sprintf("creating replicaset %s in namespace %s", rsConfig.Name, rsConfig.Namespace))
 		framework.ExpectNoError(framework.RunReplicaSet(rsConfig))
 		break
 	default:
@@ -380,7 +382,7 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 	framework.ExpectNoError(err)
 
 	dnsClusterFirst := api.DNSClusterFirst
-	controllerRcConfig := framework.RCConfig{
+	controllerRcConfig := testutils.RCConfig{
 		Client:    c,
 		Image:     resourceConsumerControllerImage,
 		Name:      controllerName,

@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -211,11 +210,9 @@ func TestTaintAndToleration(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap([]*api.Pod{{}})
-		list, err := ComputeTaintTolerationPriority(
-			test.pod,
-			nodeNameToInfo,
-			algorithm.FakeNodeLister(test.nodes))
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)
+		ttp := priorityFunction(ComputeTaintTolerationPriorityMap, ComputeTaintTolerationPriorityReduce)
+		list, err := ttp(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("%s, unexpected error: %v", test.test, err)
 		}

@@ -16,7 +16,7 @@ limitations under the License.
 
 /* This test check that SecurityContext parameters specified at the
  * pod or the container level work as intended. These tests cannot be
- * run when the 'SecurityContextDeny' addmissioin controller is not used
+ * run when the 'SecurityContextDeny' admission controller is not used
  * so they are skipped by default.
  */
 
@@ -26,7 +26,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -34,7 +34,7 @@ import (
 )
 
 func scTestPod(hostIPC bool, hostPID bool) *api.Pod {
-	podName := "security-context-" + string(util.NewUUID())
+	podName := "security-context-" + string(uuid.NewUUID())
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:        podName,
@@ -168,11 +168,10 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.Containers[0].Command = []string{"sleep", "6000"}
 
 	client := f.Client.Pods(f.Namespace.Name)
-	_, err := client.Create(pod)
+	pod, err := client.Create(pod)
 
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
-	defer client.Delete(pod.Name, nil)
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod))
 
 	testContent := "hello"
 	testFilePath := mountPath + "/TEST"
@@ -226,7 +225,6 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	}
 	_, err = client.Create(pod)
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
-	defer client.Delete(pod.Name, nil)
 
 	err = f.WaitForPodRunning(pod.Name)
 	framework.ExpectNoError(err, "Error waiting for pod to run %v", pod)

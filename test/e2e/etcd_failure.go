@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -40,7 +41,7 @@ var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
 		// providers that provide those capabilities.
 		framework.SkipUnlessProviderIs("gce")
 
-		Expect(framework.RunRC(framework.RCConfig{
+		Expect(framework.RunRC(testutils.RCConfig{
 			Client:    f.Client,
 			Name:      "baz",
 			Namespace: f.Namespace.Name,
@@ -52,8 +53,8 @@ var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
 	It("should recover from network partition with master", func() {
 		etcdFailTest(
 			f,
-			"sudo iptables -A INPUT -p tcp --destination-port 4001 -j DROP",
-			"sudo iptables -D INPUT -p tcp --destination-port 4001 -j DROP",
+			"sudo iptables -A INPUT -p tcp --destination-port 2379 -j DROP",
+			"sudo iptables -D INPUT -p tcp --destination-port 2379 -j DROP",
 		)
 	})
 

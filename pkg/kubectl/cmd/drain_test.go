@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/conversion"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -69,7 +70,7 @@ func TestCordon(t *testing.T) {
 		description string
 		node        *api.Node
 		expected    *api.Node
-		cmd         func(*cmdutil.Factory, io.Writer) *cobra.Command
+		cmd         func(cmdutil.Factory, io.Writer) *cobra.Command
 		arg         string
 		expectFatal bool
 	}{
@@ -132,7 +133,7 @@ func TestCordon(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec, ns := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		new_node := &api.Node{}
 		updated := false
 		tf.Client = &fake.RESTClient{
@@ -177,7 +178,10 @@ func TestCordon(t *testing.T) {
 				// Restore cmdutil behavior
 				cmdutil.DefaultBehaviorOnFatal()
 			}()
-			cmdutil.BehaviorOnFatal(func(e string) { saw_fatal = true; panic(e) })
+			cmdutil.BehaviorOnFatal(func(e string, code int) {
+				saw_fatal = true
+				panic(e)
+			})
 			cmd.SetArgs([]string{test.arg})
 			cmd.Execute()
 		}()
@@ -456,7 +460,7 @@ func TestDrain(t *testing.T) {
 	for _, test := range tests {
 		new_node := &api.Node{}
 		deleted := false
-		f, tf, codec, ns := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
@@ -521,7 +525,7 @@ func TestDrain(t *testing.T) {
 				// Restore cmdutil behavior
 				cmdutil.DefaultBehaviorOnFatal()
 			}()
-			cmdutil.BehaviorOnFatal(func(e string) { saw_fatal = true; panic(e) })
+			cmdutil.BehaviorOnFatal(func(e string, code int) { saw_fatal = true; panic(e) })
 			cmd.SetArgs(test.args)
 			cmd.Execute()
 		}()
@@ -552,7 +556,10 @@ type MyReq struct {
 func (m *MyReq) isFor(method string, path string) bool {
 	req := m.Request
 
-	return method == req.Method && (req.URL.Path == path || req.URL.Path == strings.Join([]string{"/api/v1", path}, "") || req.URL.Path == strings.Join([]string{"/apis/extensions/v1beta1", path}, ""))
+	return method == req.Method && (req.URL.Path == path ||
+		req.URL.Path == strings.Join([]string{"/api/v1", path}, "") ||
+		req.URL.Path == strings.Join([]string{"/apis/extensions/v1beta1", path}, "") ||
+		req.URL.Path == strings.Join([]string{"/apis/batch/v1", path}, ""))
 }
 
 func refJson(t *testing.T, o runtime.Object) string {
@@ -561,7 +568,7 @@ func refJson(t *testing.T, o runtime.Object) string {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, _, codec, _ := NewAPIFactory()
+	_, _, codec, _ := cmdtesting.NewAPIFactory()
 	json, err := runtime.Encode(codec, &api.SerializedReference{Reference: *ref})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

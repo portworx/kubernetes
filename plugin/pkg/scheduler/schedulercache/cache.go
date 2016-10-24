@@ -132,6 +132,31 @@ func (cache *schedulerCache) assumePod(pod *api.Pod, now time.Time) error {
 	return nil
 }
 
+func (cache *schedulerCache) ForgetPod(pod *api.Pod) error {
+	key, err := getPodKey(pod)
+	if err != nil {
+		return err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	_, ok := cache.podStates[key]
+	switch {
+	// Only assumed pod can be forgotten.
+	case ok && cache.assumedPods[key]:
+		err := cache.removePod(pod)
+		if err != nil {
+			return err
+		}
+		delete(cache.assumedPods, key)
+		delete(cache.podStates, key)
+	default:
+		return fmt.Errorf("pod state wasn't assumed but get forgotten. Pod key: %v", key)
+	}
+	return nil
+}
+
 func (cache *schedulerCache) AddPod(pod *api.Pod) error {
 	key, err := getPodKey(pod)
 	if err != nil {
@@ -219,12 +244,12 @@ func (cache *schedulerCache) RemovePod(pod *api.Pod) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	_, ok := cache.podStates[key]
+	cachedstate, ok := cache.podStates[key]
 	switch {
 	// An assumed pod won't have Delete/Remove event. It needs to have Add event
 	// before Remove event, in which case the state would change from Assumed to Added.
 	case ok && !cache.assumedPods[key]:
-		err := cache.removePod(pod)
+		err := cache.removePod(cachedstate.pod)
 		if err != nil {
 			return err
 		}

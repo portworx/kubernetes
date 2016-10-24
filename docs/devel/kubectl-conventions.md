@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/devel/kubectl-conventions.md).
+[here](http://releases.k8s.io/release-1.4/docs/devel/kubectl-conventions.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -43,6 +43,7 @@ Updated: 8/27/2015
   - [Principles](#principles)
   - [Command conventions](#command-conventions)
     - [Create commands](#create-commands)
+    - [Rules for extending special resource alias - "all"](#rules-for-extending-special-resource-alias---all)
   - [Flag conventions](#flag-conventions)
   - [Output conventions](#output-conventions)
   - [Documentation conventions](#documentation-conventions)
@@ -118,6 +119,21 @@ creating tls secrets. You create these as separate commands to get distinct
 flags and separate help that is tailored for the particular usage.
 
 
+### Rules for extending special resource alias - "all"
+
+Here are the rules to add a new resource to the `kubectl get all` output.
+
+* No cluster scoped resources
+
+* No namespace admin level resources (limits, quota, policy, authorization
+rules)
+
+* No resources that are potentially unrecoverable (secrets and pvc)
+
+* Resources that are considered "similar" to #3 should be grouped
+the same (configmaps)
+
+
 ## Flag conventions
 
 * Flags are all lowercase, with words separated by hyphens
@@ -142,6 +158,7 @@ list when adding new short flags
 
   * `-f`: Resource file
     * also used for `--follow` in `logs`, but should be deprecated in favor of `-F`
+  * `-n`: Namespace scope
   * `-l`: Label selector
     * also used for `--labels` in `expose`, but should be deprecated
   * `-L`: Label columns
@@ -284,23 +301,24 @@ Sample command skeleton:
 // MineRecommendedName is the recommended command name for kubectl mine.
 const MineRecommendedName = "mine"
 
+// Long command description and examples.
+var (
+  mineLong = templates.LongDesc(`
+    mine which is described here
+    with lots of details.`)
+
+  mineExample = templates.Examples(`
+    # Run my command's first action
+    kubectl mine first_action
+
+    # Run my command's second action on latest stuff
+    kubectl mine second_action --flag`)
+)
+
 // MineConfig contains all the options for running the mine cli command.
 type MineConfig struct {
   mineLatest bool
 }
-
-var (
-  mineLong = dedent.Dedent(`
-        mine which is described here
-        with lots of details.`)
-
-  mineExample = dedent.Dedent(`
-          # Run my command's first action
-          kubectl mine first_action
-
-          # Run my command's second action on latest stuff
-          kubectl mine second_action --flag`)
-)
 
 // NewCmdMine implements the kubectl mine command.
 func NewCmdMine(parent, name string, f *cmdutil.Factory, out io.Writer) *cobra.Command {

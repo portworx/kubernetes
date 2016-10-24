@@ -47,14 +47,15 @@ func TestKubectlValidation(t *testing.T) {
 	ctx := clientcmdapi.NewContext()
 	cfg := clientcmdapi.NewConfig()
 	// Enable swagger api on master.
-	components.KubeMaster.InstallSwaggerAPI()
+	components.KubeMaster.GenericAPIServer.InstallSwaggerAPI()
 	cluster := clientcmdapi.NewCluster()
+
 	cluster.Server = components.ApiServer.URL
 	cluster.InsecureSkipTLSVerify = true
+	cfg.Contexts = map[string]*clientcmdapi.Context{"test": ctx}
+	cfg.CurrentContext = "test"
 	overrides := clientcmd.ConfigOverrides{
-		ClusterInfo:    *cluster,
-		Context:        *ctx,
-		CurrentContext: "test",
+		ClusterInfo: *cluster,
 	}
 	cmdConfig := clientcmd.NewNonInteractiveClientConfig(*cfg, "test", &overrides, nil)
 	factory := util.NewFactory(cmdConfig)

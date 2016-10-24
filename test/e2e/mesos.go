@@ -65,7 +65,7 @@ var _ = framework.KubeDescribe("Mesos", func() {
 		client := f.Client
 		framework.ExpectNoError(framework.AllNodesReady(client, wait.ForeverTestTimeout), "all nodes ready")
 
-		nodelist := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodelist := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 
 		const ns = "static-pods"
 		numpods := int32(len(nodelist.Items))
@@ -101,7 +101,7 @@ var _ = framework.KubeDescribe("Mesos", func() {
 		})
 		framework.ExpectNoError(err)
 
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(c, podName, ns))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 

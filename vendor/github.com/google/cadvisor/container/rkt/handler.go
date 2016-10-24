@@ -84,7 +84,7 @@ func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPa
 		return nil, fmt.Errorf("this should be impossible!, new handler failing, but factory allowed, name = %s", name)
 	}
 
-	//rktnetes uses containerID: rkt://fff40827-b994-4e3a-8f88-6427c2c8a5ac:nginx
+	// rktnetes uses containerID: rkt://fff40827-b994-4e3a-8f88-6427c2c8a5ac:nginx
 	if parsed.Container == "" {
 		isPod = true
 		aliases = append(aliases, "rkt://"+parsed.Pod)
@@ -248,6 +248,21 @@ func (handler *rktContainerHandler) GetStats() (*info.ContainerStats, error) {
 	}
 
 	return stats, nil
+}
+
+func (self *rktContainerHandler) GetContainerIPAddress() string {
+	// attempt to return the ip address of the pod
+	// if a specific ip address of the pod could not be determined, return the system ip address
+	if self.isPod && len(self.apiPod.Networks) > 0 {
+		address := self.apiPod.Networks[0].Ipv4
+		if address != "" {
+			return address
+		} else {
+			return self.apiPod.Networks[0].Ipv6
+		}
+	} else {
+		return "127.0.0.1"
+	}
 }
 
 func (handler *rktContainerHandler) GetCgroupPath(resource string) (string, error) {

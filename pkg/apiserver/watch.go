@@ -120,7 +120,7 @@ type WatchServer struct {
 	t timeoutFactory
 }
 
-// Serve serves a series of encoded events via HTTP with Transfer-Encoding: chunked
+// ServeHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked
 // or over a websocket connection.
 func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w = httplog.Unlogged(w)
@@ -216,7 +216,15 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	defer ws.Close()
 	done := make(chan struct{})
-	go wsstream.IgnoreReceives(ws, 0)
+
+	go func() {
+		defer utilruntime.HandleCrash()
+		// This blocks until the connection is closed.
+		// Client should not send anything.
+		wsstream.IgnoreReceives(ws, 0)
+		// Once the client closes, we should also close
+		close(done)
+	}()
 
 	var unknown runtime.Unknown
 	internalEvent := &versioned.InternalEvent{}

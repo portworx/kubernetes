@@ -28,7 +28,7 @@ import (
 
 // newPCB generates a new PCB using the id string as a unique qualifier
 func newPCB(id string, ps *apps.PetSet) (*pcb, error) {
-	petPod, err := controller.GetPodFromTemplate(&ps.Spec.Template, ps)
+	petPod, err := controller.GetPodFromTemplate(&ps.Spec.Template, ps, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ type petSetIterator struct {
 	// errs is a list because we always want the iterator to drain.
 	errs []error
 	// petCount is the number of pets iterated over.
-	petCount int
+	petCount int32
 }
 
 // Next returns true for as long as there are elements in the underlying queue.

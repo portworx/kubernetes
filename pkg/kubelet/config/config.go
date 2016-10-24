@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/config"
@@ -124,7 +125,7 @@ type podStorage struct {
 	updates    chan<- kubetypes.PodUpdate
 
 	// contains the set of all sources that have sent at least one SET
-	sourcesSeenLock sync.Mutex
+	sourcesSeenLock sync.RWMutex
 	sourcesSeen     sets.String
 
 	// the EventRecorder to use
@@ -264,7 +265,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		updatePodsFunc(update.Pods, pods, pods)
 
 	case kubetypes.REMOVE:
-		glog.V(4).Infof("Removing a pod %v", update)
+		glog.V(4).Infof("Removing pods from source %s : %v", source, update.Pods)
 		for _, value := range update.Pods {
 			name := kubecontainer.GetPodFullName(value)
 			if existing, found := pods[name]; found {
@@ -313,8 +314,8 @@ func (s *podStorage) markSourceSet(source string) {
 }
 
 func (s *podStorage) seenSources(sources ...string) bool {
-	s.sourcesSeenLock.Lock()
-	defer s.sourcesSeenLock.Unlock()
+	s.sourcesSeenLock.RLock()
+	defer s.sourcesSeenLock.RUnlock()
 	return s.sourcesSeen.HasAll(sources...)
 }
 
@@ -340,7 +341,7 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 			name := bestPodIdentString(pod)
 			err := errlist.ToAggregate()
 			glog.Warningf("Pod[%d] (%s) from %s failed validation, ignoring: %v", i+1, name, source, err)
-			recorder.Eventf(pod, api.EventTypeWarning, kubecontainer.FailedValidation, "Error validating pod %s from %s, ignoring: %v", name, source, err)
+			recorder.Eventf(pod, api.EventTypeWarning, events.FailedValidation, "Error validating pod %s from %s, ignoring: %v", name, source, err)
 			continue
 		}
 		filtered = append(filtered, pod)

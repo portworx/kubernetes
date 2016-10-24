@@ -27,10 +27,13 @@ import (
 // ConfigOverrides holds values that should override whatever information is pulled from the actual Config object.  You can't
 // simply use an actual Config object, because Configs hold maps, but overrides are restricted to "at most one"
 type ConfigOverrides struct {
-	AuthInfo       clientcmdapi.AuthInfo
-	ClusterInfo    clientcmdapi.Cluster
-	Context        clientcmdapi.Context
-	CurrentContext string
+	AuthInfo clientcmdapi.AuthInfo
+	// ClusterDefaults are applied before the configured cluster info is loaded.
+	ClusterDefaults clientcmdapi.Cluster
+	ClusterInfo     clientcmdapi.Cluster
+	Context         clientcmdapi.Context
+	CurrentContext  string
+	Timeout         string
 }
 
 // ConfigOverrideFlags holds the flag names to be used for binding command line flags.  Notice that this structure tightly
@@ -40,6 +43,7 @@ type ConfigOverrideFlags struct {
 	ClusterOverrideFlags ClusterOverrideFlags
 	ContextOverrideFlags ContextOverrideFlags
 	CurrentContext       FlagInfo
+	Timeout              FlagInfo
 }
 
 // AuthOverrideFlags holds the flag names to be used for binding command line flags for AuthInfo objects
@@ -119,6 +123,7 @@ const (
 	FlagImpersonate  = "as"
 	FlagUsername     = "username"
 	FlagPassword     = "password"
+	FlagTimeout      = "request-timeout"
 )
 
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
@@ -149,7 +154,9 @@ func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
 		AuthOverrideFlags:    RecommendedAuthOverrideFlags(prefix),
 		ClusterOverrideFlags: RecommendedClusterOverrideFlags(prefix),
 		ContextOverrideFlags: RecommendedContextOverrideFlags(prefix),
-		CurrentContext:       FlagInfo{prefix + FlagContext, "", "", "The name of the kubeconfig context to use"},
+
+		CurrentContext: FlagInfo{prefix + FlagContext, "", "", "The name of the kubeconfig context to use"},
+		Timeout:        FlagInfo{prefix + FlagTimeout, "", "0", "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests."},
 	}
 }
 
@@ -158,7 +165,7 @@ func RecommendedContextOverrideFlags(prefix string) ContextOverrideFlags {
 	return ContextOverrideFlags{
 		ClusterName:  FlagInfo{prefix + FlagClusterName, "", "", "The name of the kubeconfig cluster to use"},
 		AuthInfoName: FlagInfo{prefix + FlagAuthInfoName, "", "", "The name of the kubeconfig user to use"},
-		Namespace:    FlagInfo{prefix + FlagNamespace, "", "", "If present, the namespace scope for this CLI request"},
+		Namespace:    FlagInfo{prefix + FlagNamespace, "n", "", "If present, the namespace scope for this CLI request"},
 	}
 }
 
@@ -188,6 +195,7 @@ func BindOverrideFlags(overrides *ConfigOverrides, flags *pflag.FlagSet, flagNam
 	BindClusterFlags(&overrides.ClusterInfo, flags, flagNames.ClusterOverrideFlags)
 	BindContextFlags(&overrides.Context, flags, flagNames.ContextOverrideFlags)
 	flagNames.CurrentContext.BindStringFlag(flags, &overrides.CurrentContext)
+	flagNames.Timeout.BindStringFlag(flags, &overrides.Timeout)
 }
 
 // BindFlags is a convenience method to bind the specified flags to their associated variables

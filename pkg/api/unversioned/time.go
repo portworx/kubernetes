@@ -20,6 +20,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+
+	"github.com/go-openapi/spec"
 	"github.com/google/gofuzz"
 )
 
@@ -29,6 +32,7 @@ import (
 //
 // +protobuf.options.marshal=false
 // +protobuf.as=Timestamp
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type Time struct {
 	time.Time `protobuf:"-"`
 }
@@ -38,6 +42,11 @@ type Time struct {
 // copy-by-assign, despite the presence of (unexported) Pointer fields.
 func (t Time) DeepCopy() Time {
 	return t
+}
+
+// String returns the representation of the time.
+func (t Time) String() string {
+	return t.Time.String()
 }
 
 // NewTime returns a wrapped instance of the provided time
@@ -134,6 +143,17 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(t.UTC().Format(time.RFC3339))
+}
+
+func (_ Time) OpenAPIDefinition() common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:   []string{"string"},
+				Format: "date-time",
+			},
+		},
+	}
 }
 
 // MarshalQueryParameter converts to a URL query parameter value

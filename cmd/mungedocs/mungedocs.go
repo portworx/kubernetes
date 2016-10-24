@@ -30,7 +30,7 @@ import (
 )
 
 // This needs to be updated when we cut a new release series.
-const latestReleaseBranch = "release-1.3"
+const latestReleaseBranch = "release-1.4"
 
 var (
 	verbose   = flag.Bool("verbose", false, "On verification failure, emit pre-munge and post-munge versions.")
@@ -158,6 +158,12 @@ func (f fileProcessor) visit(path string) error {
 func newWalkFunc(fp *fileProcessor, changesNeeded *bool) filepath.WalkFunc {
 	return func(path string, info os.FileInfo, err error) error {
 		stat, err := os.Stat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
 		if path != *rootDir && stat.IsDir() && *norecurse {
 			return filepath.SkipDir
 		}

@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/devel/running-locally.md).
+[here](http://releases.k8s.io/release-1.4/docs/devel/running-locally.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -57,7 +57,7 @@ Getting started locally
 
 #### Linux
 
-Not running Linux? Consider running Linux in a local virtual machine with [Vagrant](../getting-started-guides/vagrant.md), or on a cloud provider like [Google Compute Engine](../getting-started-guides/gce.md).
+Not running Linux? Consider running [Minikube](http://kubernetes.io/docs/getting-started-guides/minikube/), or on a cloud provider like [Google Compute Engine](../getting-started-guides/gce.md).
 
 #### Docker
 
@@ -102,6 +102,12 @@ hack/local-up-cluster.sh
 This will build and start a lightweight local cluster, consisting of a master
 and a single node. Type Control-C to shut it down.
 
+If you've already compiled the Kubernetes components, then you can avoid rebuilding them with this script by using the `-O` flag.
+
+```sh
+./hack/local-up-cluster.sh -O
+```
+
 You can use the cluster/kubectl.sh script to interact with the local cluster. hack/local-up-cluster.sh will
 print the commands to run to point kubectl at the local cluster.
 
@@ -143,7 +149,7 @@ However you cannot view the nginx start page on localhost. To verify that nginx 
 You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:
 
 ```sh
-cluster/kubectl.sh create -f docs/user-guide/pod.yaml
+cluster/kubectl.sh create -f test/fixtures/doc-yaml/user-guide/pod.yaml
 ```
 
 Congratulations!
