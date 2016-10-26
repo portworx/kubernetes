@@ -400,6 +400,7 @@ func DeepCopy_componentconfig_VolumeConfiguration(in interface{}, out interface{
 		out := out.(*VolumeConfiguration)
 		out.EnableHostPathProvisioning = in.EnableHostPathProvisioning
 		out.EnableDynamicProvisioning = in.EnableDynamicProvisioning
+		out.EnablePWXProvisioning = in.EnablePWXProvisioning
 		out.PersistentVolumeRecyclerConfiguration = in.PersistentVolumeRecyclerConfiguration
 		out.FlexVolumePluginDir = in.FlexVolumePluginDir
 		return nil

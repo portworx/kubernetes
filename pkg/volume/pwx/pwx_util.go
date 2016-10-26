@@ -25,9 +25,9 @@ import (
 	osdapi "github.com/libopenstorage/openstorage/api"
 	osdclient "github.com/libopenstorage/openstorage/api/client"
 	osdvolume "github.com/libopenstorage/openstorage/volume"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/pwx"
+	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 const (
@@ -62,9 +62,9 @@ func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map
 		return "", 0, nil, err
 	}
 
-	requestBytes := p.options.Capacity.Value()
+	capacity := p.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
 	// PWX works in GB
-	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
+	requestGB := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
 
 	var labels map[string]string
 	if p.options.CloudTags == nil {
@@ -98,12 +98,12 @@ func (util *PWXDiskUtil) newOsdClient(hostName string) (osdvolume.VolumeDriver, 
 		clientUrl = hostName + ":" + osdMgmtPort
 	}
 
-	client, err := osdclient.NewClient(clientUrl, osdDriverVersion)
+	volumeClient, err := osdclient.NewClient(clientUrl, osdDriverVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	return client.VolumeDriver(), nil
+	return volumeclient.VolumeDriver(volumeClient), nil
 }
 
 func (util *PWXDiskUtil) AttachVolume(m *pwxVolumeMounter) (string, error) {
@@ -219,14 +219,4 @@ func pathExists(path string) (bool, error) {
 	} else {
 		return false, err
 	}
-}
-
-// Return cloud provider
-func getCloudProvider(cloudProvider cloudprovider.Interface) (*pwx.PWXCloud, error) {
-	pwxCloudProvider, ok := cloudProvider.(*pwx.PWXCloud)
-	if !ok || pwxCloudProvider == nil {
-		return nil, fmt.Errorf("Failed to get PWX Cloud Provider. plugin.host.GetCloudProvider returned %v instead", cloudProvider)
-	}
-
-	return pwxCloudProvider, nil
 }

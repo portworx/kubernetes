@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.7",
+	"GoVersion": "go1.6",
 	"GodepVersion": "v74",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
@@ -106,6 +106,10 @@
 			"ImportPath": "github.com/appc/spec/schema/types",
 			"Comment": "v0.8.1-6-gab50d12",
 			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
+		},
+		{
+			"ImportPath": "github.com/armon/go-metrics",
+			"Rev": "3df31a1ada83e310c2e24b267c8e8b68836547b4"
 		},
 		{
 			"ImportPath": "github.com/asaskevich/govalidator",
@@ -332,13 +336,13 @@
 			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
 		},
 		{
-			"ImportPath": "github.com/clusterhq/flocker-go",
-			"Rev": "2b8b7259d3139c96c4a6871031355808ab3fd3b3"
-		},
-		{
 			"ImportPath": "github.com/cloudfoundry/gosigar",
 			"Comment": "scotty_09012012-30-gc32d31a",
 			"Rev": "c32d31af94b0e9d3b2877e49c1a581ad5a793343"
+		},
+		{
+			"ImportPath": "github.com/clusterhq/flocker-go",
+			"Rev": "2b8b7259d3139c96c4a6871031355808ab3fd3b3"
 		},
 		{
 			"ImportPath": "github.com/codegangsta/negroni",
@@ -1373,6 +1377,14 @@
 			"Rev": "f52d055dc48aec25854ed7d31862f78913cf17d1"
 		},
 		{
+			"ImportPath": "github.com/hashicorp/errwrap",
+			"Rev": "7554cd9344cec97297fa6649b055a8c98c2a1e55"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/go-msgpack/codec",
+			"Rev": "fa3f63826f7c23912c15263591e65d54d080b458"
+		},
+		{
 			"ImportPath": "github.com/hashicorp/go-multierror",
 			"Rev": "d30f09973e19c1dfcd120b2d9c4f168e68d6b5d5"
 		},
@@ -1419,6 +1431,14 @@
 		{
 			"ImportPath": "github.com/hashicorp/hcl/json/token",
 			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/logutils",
+			"Rev": "0dc08b1671f34c4250ce212759ebd880f743d883"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/memberlist",
+			"Rev": "7ad712f5f34ec40aebe6ca47756d07898486a8d2"
 		},
 		{
 			"ImportPath": "github.com/hawkular/hawkular-client-go/metrics",
@@ -1493,6 +1513,26 @@
 			"ImportPath": "github.com/kr/pty",
 			"Comment": "release.r56-29-gf7ee69f",
 			"Rev": "f7ee69f31298ecbe5d2b349c711e2547a617d398"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api",
+			"Rev": "a5ab1cfa3737c8d6a61f01454a452f4e158eecd9"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api/client",
+			"Rev": "a5ab1cfa3737c8d6a61f01454a452f4e158eecd9"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api/client/volume",
+			"Rev": "a5ab1cfa3737c8d6a61f01454a452f4e158eecd9"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/config",
+			"Rev": "a5ab1cfa3737c8d6a61f01454a452f4e158eecd9"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/volume",
+			"Rev": "a5ab1cfa3737c8d6a61f01454a452f4e158eecd9"
 		},
 		{
 			"ImportPath": "github.com/lpabon/godbc",
@@ -2294,6 +2334,14 @@
 			"ImportPath": "github.com/xyproto/simpleredis",
 			"Comment": "v1.0-13-g5292687",
 			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
+		},
+		{
+			"ImportPath": "go.pedge.io/dlog",
+			"Rev": "df39f69056a766a01437996bd6491558624d068c"
+		},
+		{
+			"ImportPath": "go.pedge.io/dlog/logrus",
+			"Rev": "df39f69056a766a01437996bd6491558624d068c"
 		},
 		{
 			"ImportPath": "go4.org/errorutil",

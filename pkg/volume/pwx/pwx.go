@@ -152,9 +152,6 @@ func (plugin *pwxVolumePlugin) newDeleterInternal(spec *volume.Spec, manager pwx
 }
 
 func (plugin *pwxVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
 	return plugin.newProvisionerInternal(options, &PWXDiskUtil{})
 }
 
@@ -167,6 +164,19 @@ func (plugin *pwxVolumePlugin) newProvisionerInternal(options volume.VolumeOptio
 		options: options,
 	}, nil
 }
+
+func (plugin *pwxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	pwxVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			PWXVolume: &api.PWXVolumeSource{
+				VolumeID: volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(pwxVolume), nil
+}
+
 
 func getVolumeSource(
 	spec *volume.Spec) (*api.PWXVolumeSource, bool, error) {
@@ -424,7 +434,7 @@ func (c *pwxVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   c.options.AccessModes,
+			AccessModes:                   c.options.PVC.Spec.AccessModes,
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
@@ -443,6 +453,10 @@ func (c *pwxVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		for k, v := range labels {
 			pv.Labels[k] = v
 		}
+	}
+
+	if len(c.options.PVC.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
 	return pv, nil

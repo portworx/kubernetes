@@ -126,6 +126,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ObjectMeta, InType: reflect.TypeOf(&ObjectMeta{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ObjectReference, InType: reflect.TypeOf(&ObjectReference{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_OwnerReference, InType: reflect.TypeOf(&OwnerReference{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PWXVolumeSource, InType: reflect.TypeOf(&PWXVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolume, InType: reflect.TypeOf(&PersistentVolume{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeClaim, InType: reflect.TypeOf(&PersistentVolumeClaim{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeClaimList, InType: reflect.TypeOf(&PersistentVolumeClaimList{})},
@@ -2021,6 +2022,28 @@ func DeepCopy_api_OwnerReference(in interface{}, out interface{}, c *conversion.
 	}
 }
 
+func DeepCopy_api_PWXVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PWXVolumeSource)
+		out := out.(*PWXVolumeSource)
+		out.VolumeID = in.VolumeID
+		out.FSType = in.FSType
+		out.HaLevel = in.HaLevel
+		out.BlockSize = in.BlockSize
+		out.Shared = in.Shared
+		if in.VolumeLabels != nil {
+			in, out := &in.VolumeLabels, &out.VolumeLabels
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		} else {
+			out.VolumeLabels = nil
+		}
+		return nil
+	}
+}
+
 func DeepCopy_api_PersistentVolume(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PersistentVolume)
@@ -2289,6 +2312,15 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 			}
 		} else {
 			out.AzureDisk = nil
+		}
+		if in.PWXVolume != nil {
+			in, out := &in.PWXVolume, &out.PWXVolume
+			*out = new(PWXVolumeSource)
+			if err := DeepCopy_api_PWXVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
+		} else {
+			out.PWXVolume = nil
 		}
 		return nil
 	}
@@ -3752,6 +3784,15 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 			}
 		} else {
 			out.AzureDisk = nil
+		}
+		if in.PWXVolume != nil {
+			in, out := &in.PWXVolume, &out.PWXVolume
+			*out = new(PWXVolumeSource)
+			if err := DeepCopy_api_PWXVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
+		} else {
+			out.PWXVolume = nil
 		}
 		return nil
 	}
