@@ -592,6 +592,14 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 				},
 			},
 		},
+		"pwxVolume": {
+			ObjectMeta: api.ObjectMeta{Name: "bar"},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					PWXVolume: &api.PWXVolumeSource{},
+				},
+			},
+		},
 		"cinder": {
 			ObjectMeta: api.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{

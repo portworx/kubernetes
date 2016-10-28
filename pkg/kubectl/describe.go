@@ -571,6 +571,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
 			printVsphereVolumeSource(volume.VolumeSource.VsphereVolume, out)
 		case volume.VolumeSource.Cinder != nil:
 			printCinderVolumeSource(volume.VolumeSource.Cinder, out)
+		case volume.VolumeSource.PWXVolume != nil:
+			printPWXVolumeSource(volume.VolumeSource.PWXVolume, out)
 		default:
 			fmt.Fprintf(out, "  <unknown>\n")
 		}
@@ -636,6 +638,13 @@ func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, out io.Writer) {
 		"    Volume:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		quobyte.Registry, quobyte.Volume, quobyte.ReadOnly)
+}
+
+func printPWXVolumeSource(pwxVolume *api.PWXVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tPWXVolume (a Portworx Volume resource)\n"+
+		"    VolumeID:\t%\n"+
+		"    HaLevel:\t%v\n"+
+		pwxVolume.VolumeID, pwxVolume.HaLevel)
 }
 
 func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, out io.Writer) {
