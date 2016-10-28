@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"math"
+	"strconv"
 
 	"github.com/golang/glog"
 	osdapi "github.com/libopenstorage/openstorage/api"
@@ -31,7 +33,7 @@ import (
 )
 
 const (
-	osdMgmtPort      = "9007"
+	osdMgmtPort      = "9001"
 	osdDriverVersion = "v1"
 	pxdDevicePrefix  = "/dev/pxd/pxd"
 )
@@ -75,9 +77,43 @@ func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map
 
 	spec := osdapi.VolumeSpec{
 		Size:    uint64(requestGB),
-		HaLevel: 1,
-		Format:  osdapi.FSType_FS_TYPE_EXT4,
+		// Default format is btrfs
+		Format: osdapi.FSType_FS_TYPE_BTRFS,
 	}
+
+        for k, v := range p.options.Parameters {
+		switch strings.ToLower(k) {
+		case "repl":
+                        repl, err := strconv.Atoi(v)
+			if err != nil {
+				return "", 0, nil, fmt.Errorf("invalid replication factor %q, must be [1..3]", v)
+			}
+			spec.HaLevel = int64(repl)
+
+                case "fs":
+			fsType, err := osdapi.FSTypeSimpleValueOf(v)
+			if err != nil {
+				return "", 0, nil, fmt.Errorf("invalid fs value %q, must be ext4|btrfs", v)
+			}
+			spec.Format = fsType
+		case "si":
+			si, err := strconv.Atoi(v)
+			if err != nil {
+				return "", 0, nil, fmt.Errorf("invalid snapshot interval value %q, must be a number", v)
+			}
+			err = checkSnapInterval(si)
+			if err != nil {
+				return "", 0, nil, err
+			}
+			spec.SnapshotInterval = uint32(si)
+		case "cos":
+			cos, err := cosLevel(v)
+			if err != nil {
+				return "", 0, nil, err
+			}
+			spec.Cos = cos
+                }
+        }
 	source := osdapi.Source{}
 	locator := osdapi.VolumeLocator{
 		Name:         p.options.PVName,
@@ -219,4 +255,28 @@ func pathExists(path string) (bool, error) {
 	} else {
 		return false, err
 	}
+}
+
+func checkSnapInterval(snapInterval int) error {
+	if snapInterval == math.MaxUint32 || snapInterval < 0 ||
+		(snapInterval > 0 && snapInterval < 60) {
+		return fmt.Errorf(
+			"Interval must be greater than or equal to 60 and less than %v"+
+				" or 0 to disable scheduled snapshots",
+			math.MaxUint32)
+	}
+	return nil
+}
+
+func cosLevel(cos string) (uint32, error) {
+	switch cos {
+	case "high", "3":
+		return uint32(osdapi.CosType_COS_TYPE_HIGH), nil
+	case "medium", "2":
+		return uint32(osdapi.CosType_COS_TYPE_MEDIUM), nil
+	case "low", "1":
+		return uint32(osdapi.CosType_COS_TYPE_LOW), nil
+	}
+	return uint32(osdapi.CosType_COS_TYPE_LOW),
+		fmt.Errorf("Cos must be one of %q | %q | %q", "high", "medium", "low")
 }
