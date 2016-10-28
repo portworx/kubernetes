@@ -1,0 +1,9 @@
+apiVersion: storage.k8s.io/v1beta1
+kind: StorageClass
+metadata:
+   name: slow
+provisioner: kubernetes.io/pwx-volume
+parameters:
+  repl: "1"
+  si:   "70"
+  cos:  "low"
