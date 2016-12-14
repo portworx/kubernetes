@@ -18,24 +18,32 @@ package pwx
 
 import (
 	"fmt"
-	"os"
-	"strings"
 	"math"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	osdapi "github.com/libopenstorage/openstorage/api"
-	osdclient "github.com/libopenstorage/openstorage/api/client"
-	osdvolume "github.com/libopenstorage/openstorage/volume"
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
-	"k8s.io/kubernetes/pkg/volume"
+	osdvolume "github.com/libopenstorage/openstorage/volume"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
-	osdMgmtPort      = "9001"
-	osdDriverVersion = "v1"
-	pxdDevicePrefix  = "/dev/pxd/pxd"
+	osdMgmtPort           = "9001"
+	osdDriverVersion      = "v1"
+	pxdDriverName         = "pxd"
+	pxdDevicePrefix       = "/dev/pxd/pxd"
+	replLabel             = "repl"
+	encryptedLabel        = "secure"
+	cosLabel              = "cos"
+	sharedLabel           = "shared"
+	fsLabel               = "fs"
+	snapshotIntervalLabel = "snapshot_interval"
+	passphraseLabel       = "passphrase"
+	aggregationLabel      = "aggregation_level"
 )
 
 type PWXDiskUtil struct{}
@@ -76,27 +84,26 @@ func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map
 	}
 
 	spec := osdapi.VolumeSpec{
-		Size:    uint64(requestGB),
+		Size: uint64(requestGB),
 		// Default format is btrfs
 		Format: osdapi.FSType_FS_TYPE_BTRFS,
 	}
 
-        for k, v := range p.options.Parameters {
+	for k, v := range p.options.Parameters {
 		switch strings.ToLower(k) {
-		case "repl":
-                        repl, err := strconv.Atoi(v)
+		case replLabel:
+			repl, err := strconv.Atoi(v)
 			if err != nil {
 				return "", 0, nil, fmt.Errorf("invalid replication factor %q, must be [1..3]", v)
 			}
 			spec.HaLevel = int64(repl)
-
-                case "fs":
+		case fsLabel:
 			fsType, err := osdapi.FSTypeSimpleValueOf(v)
 			if err != nil {
 				return "", 0, nil, fmt.Errorf("invalid fs value %q, must be ext4|btrfs", v)
 			}
 			spec.Format = fsType
-		case "si":
+		case snapshotIntervalLabel:
 			si, err := strconv.Atoi(v)
 			if err != nil {
 				return "", 0, nil, fmt.Errorf("invalid snapshot interval value %q, must be a number", v)
@@ -106,14 +113,18 @@ func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map
 				return "", 0, nil, err
 			}
 			spec.SnapshotInterval = uint32(si)
-		case "cos":
+		case cosLabel:
 			cos, err := cosLevel(v)
 			if err != nil {
 				return "", 0, nil, err
 			}
 			spec.Cos = cos
-                }
-        }
+		case sharedLabel:
+			spec.Shared = true
+		default:
+			labels[strings.ToLower(k)] = v
+		}
+	}
 	source := osdapi.Source{}
 	locator := osdapi.VolumeLocator{
 		Name:         p.options.PVName,
@@ -134,12 +145,12 @@ func (util *PWXDiskUtil) newOsdClient(hostName string) (osdvolume.VolumeDriver, 
 		clientUrl = hostName + ":" + osdMgmtPort
 	}
 
-	volumeClient, err := osdclient.NewClient(clientUrl, osdDriverVersion)
+	driverClient, err := volumeclient.NewDriverClient(clientUrl, pxdDriverName, osdDriverVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	return volumeclient.VolumeDriver(volumeClient), nil
+	return volumeclient.VolumeDriver(driverClient), nil
 }
 
 func (util *PWXDiskUtil) AttachVolume(m *pwxVolumeMounter) (string, error) {
@@ -268,15 +279,15 @@ func checkSnapInterval(snapInterval int) error {
 	return nil
 }
 
-func cosLevel(cos string) (uint32, error) {
+func cosLevel(cos string) (osdapi.CosType, error) {
 	switch cos {
 	case "high", "3":
-		return uint32(osdapi.CosType_COS_TYPE_HIGH), nil
+		return osdapi.CosType_COS_TYPE_HIGH, nil
 	case "medium", "2":
-		return uint32(osdapi.CosType_COS_TYPE_MEDIUM), nil
+		return osdapi.CosType_COS_TYPE_MEDIUM, nil
 	case "low", "1":
-		return uint32(osdapi.CosType_COS_TYPE_LOW), nil
+		return osdapi.CosType_COS_TYPE_LOW, nil
 	}
-	return uint32(osdapi.CosType_COS_TYPE_LOW),
+	return osdapi.CosType_COS_TYPE_LOW,
 		fmt.Errorf("Cos must be one of %q | %q | %q", "high", "medium", "low")
 }
