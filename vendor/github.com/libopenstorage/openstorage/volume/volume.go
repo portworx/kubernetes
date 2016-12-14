@@ -21,6 +21,15 @@ var (
 	ErrNotSupported            = errors.New("Operation not supported")
 )
 
+// Constants used by the VolumeDriver
+const (
+	APIVersion   = "v1"
+	PluginAPIBase      = "/run/docker/plugins/"
+	DriverAPIBase      = "/var/lib/osd/driver/"
+	MountBase          = "/var/lib/osd/mounts/"
+	VolumeBase         = "/var/lib/osd/"
+)
+
 type Store interface {
 	// Lock volume specified by volumeID.
 	Lock(volumeID string) (interface{}, error)
@@ -88,8 +97,10 @@ type ProtoDriver interface {
 	// updates.
 	Set(volumeID string, locator *api.VolumeLocator, spec *api.VolumeSpec) error
 	// Stats for specified volume.
+	// cumulative stats are /proc/diskstats style stats.
+	// nonCumulative stats are stats for specific duration.
 	// Errors ErrEnoEnt may be returned
-	Stats(volumeID string) (*api.Stats, error)
+	Stats(volumeID string, cumulative bool) (*api.Stats, error)
 	// Alerts on this volume.
 	// Errors ErrEnoEnt may be returned
 	Alerts(volumeID string) (*api.Alerts, error)
