@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pwx
+package portworx
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ import (
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("portworxVolumeTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -41,23 +41,23 @@ func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/portworx-volume")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.Name() != "kubernetes.io/aws-ebs" {
+	if plug.Name() != "kubernetes.io/portworx-volume" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{PortworxVolume: &api.PortworxVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if !plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{PortworxVolume: &api.PortworxVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("awsebsTest")
+	tmpDir, err := utiltesting.MkTmpdir("portworxVolumeTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/aws-ebs")
+	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/portworx-volume")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -146,7 +146,7 @@ func TestPlugin(t *testing.T) {
 	spec := &api.Volume{
 		Name: "vol1",
 		VolumeSource: api.VolumeSource{
-			AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+			AWSElasticBlockStore: &api.PortworxVolumeSource{
 				VolumeID: "pd",
 				FSType:   "ext4",
 			},
@@ -256,7 +256,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{},
+				AWSElasticBlockStore: &api.PortworxVolumeSource{},
 			},
 			ClaimRef: &api.ObjectReference{
 				Name: "claimA",
@@ -314,7 +314,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	spec := &api.Volume{
 		Name: "vol1",
 		VolumeSource: api.VolumeSource{
-			AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+			AWSElasticBlockStore: &api.PortworxVolumeSource{
 				VolumeID: "pd",
 				FSType:   "ext4",
 			},

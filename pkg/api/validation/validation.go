@@ -665,12 +665,12 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 			allErrs = append(allErrs, validateVsphereVolumeSource(source.VsphereVolume, fldPath.Child("vsphereVolume"))...)
 		}
 	}
-	if source.PWXVolume != nil {
+	if source.PortworxVolume != nil {
 		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("pwxVolume"), "may not specify more than 1 volume type"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("portworxVolume"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validatePWXVolumeSource(source.PWXVolume, fldPath.Child("pwxVolume"))...)
+			allErrs = append(allErrs, validatePortworxVolumeSource(source.PortworxVolume, fldPath.Child("portworxVolume"))...)
 		}
 	}
 	if source.AzureDisk != nil {
@@ -1015,7 +1015,7 @@ func validateVsphereVolumeSource(cd *api.VsphereVirtualDiskVolumeSource, fldPath
 	return allErrs
 }
 
-func validatePWXVolumeSource(pwx *api.PWXVolumeSource, fldPath *field.Path) field.ErrorList {
+func validatePortworxVolumeSource(pwx *api.PortworxVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(pwx.VolumeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
@@ -1175,12 +1175,12 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, validateVsphereVolumeSource(pv.Spec.VsphereVolume, specPath.Child("vsphereVolume"))...)
 		}
 	}
-	if pv.Spec.PWXVolume != nil {
+	if pv.Spec.PortworxVolume != nil {
 		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(specPath.Child("pwxVolume"), "may not specify more than 1 volume type"))
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("portworxVolume"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validatePWXVolumeSource(pv.Spec.PWXVolume, specPath.Child("pwxVolume"))...)
+			allErrs = append(allErrs, validatePortworxVolumeSource(pv.Spec.PortworxVolume, specPath.Child("portworxVolume"))...)
 		}
 	}
 	if pv.Spec.AzureDisk != nil {

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pwx
+package portworx
 
 import (
 	"fmt"
@@ -46,9 +46,9 @@ const (
 	aggregationLabel      = "aggregation_level"
 )
 
-type PWXDiskUtil struct{}
+type PortworxDiskUtil struct{}
 
-func (util *PWXDiskUtil) DeleteVolume(d *pwxVolumeDeleter) error {
+func (util *PortworxDiskUtil) DeleteVolume(d *portworxVolumeDeleter) error {
 	hostName := d.plugin.host.GetHostName()
 	client, err := util.newOsdClient(hostName)
 	if err != nil {
@@ -65,7 +65,7 @@ func (util *PWXDiskUtil) DeleteVolume(d *pwxVolumeDeleter) error {
 
 // CreateVolume creates a PWX volume.
 // Returns: volumeID, volumeSize, labels, error
-func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map[string]string, error) {
+func (util *PortworxDiskUtil) CreateVolume(p *portworxVolumeProvisioner) (string, int, map[string]string, error) {
 	hostName := p.plugin.host.GetHostName()
 	client, err := util.newOsdClient(hostName)
 	if err != nil {
@@ -137,7 +137,7 @@ func (util *PWXDiskUtil) CreateVolume(p *pwxVolumeProvisioner) (string, int, map
 	return volumeID, requestGB, nil, err
 }
 
-func (util *PWXDiskUtil) newOsdClient(hostName string) (osdvolume.VolumeDriver, error) {
+func (util *PortworxDiskUtil) newOsdClient(hostName string) (osdvolume.VolumeDriver, error) {
 	var clientUrl string
 	if !strings.HasPrefix(hostName, "http://") {
 		clientUrl = "http://" + hostName + ":" + osdMgmtPort
@@ -153,7 +153,7 @@ func (util *PWXDiskUtil) newOsdClient(hostName string) (osdvolume.VolumeDriver, 
 	return volumeclient.VolumeDriver(driverClient), nil
 }
 
-func (util *PWXDiskUtil) AttachVolume(m *pwxVolumeMounter) (string, error) {
+func (util *PortworxDiskUtil) AttachVolume(m *portworxVolumeMounter) (string, error) {
 	hostName := m.plugin.host.GetHostName()
 	client, err := util.newOsdClient(hostName)
 	if err != nil {
@@ -173,7 +173,7 @@ func (util *PWXDiskUtil) AttachVolume(m *pwxVolumeMounter) (string, error) {
 	return devicePath, err
 }
 
-func (util *PWXDiskUtil) DetachVolume(u *pwxVolumeUnmounter, deviceName string) error {
+func (util *PortworxDiskUtil) DetachVolume(u *portworxVolumeUnmounter, deviceName string) error {
 	hostName := u.plugin.host.GetHostName()
 	client, err := util.newOsdClient(hostName)
 	if err != nil {
@@ -193,7 +193,7 @@ func (util *PWXDiskUtil) DetachVolume(u *pwxVolumeUnmounter, deviceName string) 
 	return err
 }
 
-func (util *PWXDiskUtil) MountVolume(m *pwxVolumeMounter, mountPath string) error {
+func (util *PortworxDiskUtil) MountVolume(m *portworxVolumeMounter, mountPath string) error {
 	hostName := m.plugin.host.GetHostName()
 	client, err := util.newOsdClient(hostName)
 	if err != nil {
@@ -208,7 +208,7 @@ func (util *PWXDiskUtil) MountVolume(m *pwxVolumeMounter, mountPath string) erro
 	return nil
 }
 
-func (util *PWXDiskUtil) UnmountVolume(u *pwxVolumeUnmounter, deviceName, mountPath string) error {
+func (util *PortworxDiskUtil) UnmountVolume(u *portworxVolumeUnmounter, deviceName, mountPath string) error {
 	hostName := u.plugin.host.GetHostName()
 	client, err := util.newOsdClient(hostName)
 	if err != nil {

@@ -126,7 +126,6 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ObjectMeta, InType: reflect.TypeOf(&ObjectMeta{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ObjectReference, InType: reflect.TypeOf(&ObjectReference{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_OwnerReference, InType: reflect.TypeOf(&OwnerReference{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PWXVolumeSource, InType: reflect.TypeOf(&PWXVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolume, InType: reflect.TypeOf(&PersistentVolume{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeClaim, InType: reflect.TypeOf(&PersistentVolumeClaim{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeClaimList, InType: reflect.TypeOf(&PersistentVolumeClaimList{})},
@@ -155,6 +154,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodTemplate, InType: reflect.TypeOf(&PodTemplate{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodTemplateList, InType: reflect.TypeOf(&PodTemplateList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodTemplateSpec, InType: reflect.TypeOf(&PodTemplateSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PortworxVolumeSource, InType: reflect.TypeOf(&PortworxVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Preconditions, InType: reflect.TypeOf(&Preconditions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PreferAvoidPodsEntry, InType: reflect.TypeOf(&PreferAvoidPodsEntry{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PreferredSchedulingTerm, InType: reflect.TypeOf(&PreferredSchedulingTerm{})},
@@ -2022,28 +2022,6 @@ func DeepCopy_api_OwnerReference(in interface{}, out interface{}, c *conversion.
 	}
 }
 
-func DeepCopy_api_PWXVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PWXVolumeSource)
-		out := out.(*PWXVolumeSource)
-		out.VolumeID = in.VolumeID
-		out.FSType = in.FSType
-		out.HaLevel = in.HaLevel
-		out.BlockSize = in.BlockSize
-		out.Shared = in.Shared
-		if in.VolumeLabels != nil {
-			in, out := &in.VolumeLabels, &out.VolumeLabels
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.VolumeLabels = nil
-		}
-		return nil
-	}
-}
-
 func DeepCopy_api_PersistentVolume(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PersistentVolume)
@@ -2313,14 +2291,12 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 		} else {
 			out.AzureDisk = nil
 		}
-		if in.PWXVolume != nil {
-			in, out := &in.PWXVolume, &out.PWXVolume
-			*out = new(PWXVolumeSource)
-			if err := DeepCopy_api_PWXVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
+		if in.PortworxVolume != nil {
+			in, out := &in.PortworxVolume, &out.PortworxVolume
+			*out = new(PortworxVolumeSource)
+			**out = **in
 		} else {
-			out.PWXVolume = nil
+			out.PortworxVolume = nil
 		}
 		return nil
 	}
@@ -2863,6 +2839,16 @@ func DeepCopy_api_PodTemplateSpec(in interface{}, out interface{}, c *conversion
 		if err := DeepCopy_api_PodSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
+		return nil
+	}
+}
+
+func DeepCopy_api_PortworxVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PortworxVolumeSource)
+		out := out.(*PortworxVolumeSource)
+		out.VolumeID = in.VolumeID
+		out.FSType = in.FSType
 		return nil
 	}
 }
@@ -3785,14 +3771,12 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 		} else {
 			out.AzureDisk = nil
 		}
-		if in.PWXVolume != nil {
-			in, out := &in.PWXVolume, &out.PWXVolume
-			*out = new(PWXVolumeSource)
-			if err := DeepCopy_api_PWXVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
+		if in.PortworxVolume != nil {
+			in, out := &in.PortworxVolume, &out.PortworxVolume
+			*out = new(PortworxVolumeSource)
+			**out = **in
 		} else {
-			out.PWXVolume = nil
+			out.PortworxVolume = nil
 		}
 		return nil
 	}

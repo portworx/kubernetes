@@ -10037,66 +10037,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
-	"v1.PWXVolumeSource": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Represents a Portworx volume resource.",
-				Properties: map[string]spec.Schema{
-					"volumeID": {
-						SchemaProps: spec.SchemaProps{
-							Description: "VolumeID is the id of the volume",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"fsType": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"ha_level": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the number of nodes that are allowed to fail, and yet data is available A value of 0 implies that data is not erasure coded, a failure of a node will lead to data loss",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"block_size": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Block size for filesystem",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"shared": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Shared is true is this volume can be remotely accessed.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"volumeLabels": {
-						SchemaProps: spec.SchemaProps{
-							Description: "VolumeLabels",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"volumeID", "fsType", "ha_level", "block_size", "shared", "volumeLabels"},
-			},
-		},
-		Dependencies: []string{},
-	},
 	"v1.PersistentVolume": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10432,17 +10372,17 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Ref:         spec.MustCreateRef("#/definitions/v1.AzureDiskVolumeSource"),
 						},
 					},
-					"pwxVolume": {
+					"portworxVolume": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PwxVolume represents a portworx volume attached and mounted on kubelets host machine",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PWXVolumeSource"),
+							Description: "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
+							Ref:         spec.MustCreateRef("#/definitions/v1.PortworxVolumeSource"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PWXVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
+			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PortworxVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
 	},
 	"v1.PersistentVolumeSpec": {
 		Schema: spec.Schema{
@@ -11340,6 +11280,31 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1.PodSpec"},
+	},
+	"v1.PortworxVolumeSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Represents a Portworx volume resource.",
+				Properties: map[string]spec.Schema{
+					"volumeID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "VolumeID is the id of the volume",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"fsType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"volumeID", "fsType"},
+			},
+		},
+		Dependencies: []string{},
 	},
 	"v1.Preconditions": {
 		Schema: spec.Schema{
@@ -13033,17 +12998,17 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Ref:         spec.MustCreateRef("#/definitions/v1.AzureDiskVolumeSource"),
 						},
 					},
-					"pwxVolume": {
+					"portworxVolume": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PwxVolume represents a portworx volume attached and mounted on kubelets host machine",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PWXVolumeSource"),
+							Description: "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
+							Ref:         spec.MustCreateRef("#/definitions/v1.PortworxVolumeSource"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.ConfigMapVolumeSource", "v1.DownwardAPIVolumeSource", "v1.EmptyDirVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GitRepoVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PWXVolumeSource", "v1.PersistentVolumeClaimVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.SecretVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
+			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.ConfigMapVolumeSource", "v1.DownwardAPIVolumeSource", "v1.EmptyDirVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GitRepoVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PersistentVolumeClaimVolumeSource", "v1.PortworxVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.SecretVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
 	},
 	"v1.VsphereVirtualDiskVolumeSource": {
 		Schema: spec.Schema{

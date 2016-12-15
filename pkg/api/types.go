@@ -281,9 +281,9 @@ type VolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
-	// PwxVolume represents a portworx volume attached and mounted on kubelets host machine
+	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
 	// +optional
-	PWXVolume *PWXVolumeSource `json:"pwxVolume,omitempty"`
+	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -344,9 +344,9 @@ type PersistentVolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
-	// PWXVolume represents a portworx volume attached and mounted on kubelets host machine
+	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
 	// +optional
-	PWXVolume *PWXVolumeSource `json:"pwxVolume,omitempty"`
+	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -935,7 +935,7 @@ type VsphereVirtualDiskVolumeSource struct {
 }
 
 // Represents a Portworx volume resource.
-type PWXVolumeSource struct {
+type PortworxVolumeSource struct {
 	// VolumeID is the id of the volume
 	VolumeID string `json:"volumeID"`
 	// Filesystem type to mount
@@ -943,21 +943,6 @@ type PWXVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
 	FSType string `json:"fsType,omitempty"`
-	// Specifies the number of nodes that are
-	// allowed to fail, and yet data is available
-	// A value of 0 implies that data is not erasure coded,
-	// a failure of a node will lead to data loss
-	// +optional
-	HaLevel int64 `json:"ha_level,omitempty"`
-	// Block size for filesystem
-	// +optional
-	BlockSize int64 `json:"block_size,omitempty"`
-	// Shared is true is this volume can be remotely accessed.
-	// +optional
-	Shared bool `json:"shared,omitempty"`
-	// VolumeLabels
-	// +optional
-	VolumeLabels map[string]string `json: "volumeLabels,omitempty"`
 }
 
 type AzureDataDiskCachingMode string

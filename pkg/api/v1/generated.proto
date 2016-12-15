@@ -1829,32 +1829,6 @@ message OwnerReference {
   optional bool controller = 6;
 }
 
-// Represents a Portworx volume resource.
-message PWXVolumeSource {
-  // VolumeID is the id of the volume
-  optional string volumeID = 1;
-
-  // Filesystem type to mount
-  // Must be a filesystem type supported by the host operating system.
-  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-  optional string fsType = 2;
-
-  // Specifies the number of nodes that are
-  // allowed to fail, and yet data is available
-  // A value of 0 implies that data is not erasure coded,
-  // a failure of a node will lead to data loss
-  optional int64 ha_level = 3;
-
-  // Block size for filesystem
-  optional int64 block_size = 4;
-
-  // Shared is true is this volume can be remotely accessed.
-  optional bool shared = 5;
-
-  // VolumeLabels
-  map<string, string> volumeLabels = 6;
-}
-
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
 // It is analogous to a node.
 // More info: http://kubernetes.io/docs/user-guide/persistent-volumes
@@ -2057,9 +2031,9 @@ message PersistentVolumeSource {
   // +optional
   optional AzureDiskVolumeSource azureDisk = 16;
 
-  // PwxVolume represents a portworx volume attached and mounted on kubelets host machine
+  // PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
   // +optional
-  optional PWXVolumeSource pwxVolume = 17;
+  optional PortworxVolumeSource portworxVolume = 17;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -2647,6 +2621,17 @@ message PodTemplateSpec {
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
   // +optional
   optional PodSpec spec = 2;
+}
+
+// Represents a Portworx volume resource.
+message PortworxVolumeSource {
+  // VolumeID is the id of the volume
+  optional string volumeID = 1;
+
+  // Filesystem type to mount
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  optional string fsType = 2;
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -3573,9 +3558,9 @@ message VolumeSource {
   // +optional
   optional AzureDiskVolumeSource azureDisk = 22;
 
-  // PwxVolume represents a portworx volume attached and mounted on kubelets host machine
+  // PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
   // +optional
-  optional PWXVolumeSource pwxVolume = 23;
+  optional PortworxVolumeSource portworxVolume = 23;
 }
 
 // Represents a vSphere volume resource.

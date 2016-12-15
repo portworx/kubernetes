@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package pwx contains the internal representation of Portworx
+// Package portworx contains the internal representation of Portworx
 // Block Device volumes.
-package pwx
+package portworx

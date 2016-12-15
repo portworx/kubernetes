@@ -208,8 +208,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_ObjectReference_To_v1_ObjectReference,
 		Convert_v1_OwnerReference_To_api_OwnerReference,
 		Convert_api_OwnerReference_To_v1_OwnerReference,
-		Convert_v1_PWXVolumeSource_To_api_PWXVolumeSource,
-		Convert_api_PWXVolumeSource_To_v1_PWXVolumeSource,
 		Convert_v1_PersistentVolume_To_api_PersistentVolume,
 		Convert_api_PersistentVolume_To_v1_PersistentVolume,
 		Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim,
@@ -266,6 +264,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_PodTemplateList_To_v1_PodTemplateList,
 		Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec,
 		Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec,
+		Convert_v1_PortworxVolumeSource_To_api_PortworxVolumeSource,
+		Convert_api_PortworxVolumeSource_To_v1_PortworxVolumeSource,
 		Convert_v1_Preconditions_To_api_Preconditions,
 		Convert_api_Preconditions_To_v1_Preconditions,
 		Convert_v1_PreferAvoidPodsEntry_To_api_PreferAvoidPodsEntry,
@@ -3809,34 +3809,6 @@ func Convert_api_OwnerReference_To_v1_OwnerReference(in *api.OwnerReference, out
 	return autoConvert_api_OwnerReference_To_v1_OwnerReference(in, out, s)
 }
 
-func autoConvert_v1_PWXVolumeSource_To_api_PWXVolumeSource(in *PWXVolumeSource, out *api.PWXVolumeSource, s conversion.Scope) error {
-	out.VolumeID = in.VolumeID
-	out.FSType = in.FSType
-	out.HaLevel = in.HaLevel
-	out.BlockSize = in.BlockSize
-	out.Shared = in.Shared
-	out.VolumeLabels = in.VolumeLabels
-	return nil
-}
-
-func Convert_v1_PWXVolumeSource_To_api_PWXVolumeSource(in *PWXVolumeSource, out *api.PWXVolumeSource, s conversion.Scope) error {
-	return autoConvert_v1_PWXVolumeSource_To_api_PWXVolumeSource(in, out, s)
-}
-
-func autoConvert_api_PWXVolumeSource_To_v1_PWXVolumeSource(in *api.PWXVolumeSource, out *PWXVolumeSource, s conversion.Scope) error {
-	out.VolumeID = in.VolumeID
-	out.FSType = in.FSType
-	out.HaLevel = in.HaLevel
-	out.BlockSize = in.BlockSize
-	out.Shared = in.Shared
-	out.VolumeLabels = in.VolumeLabels
-	return nil
-}
-
-func Convert_api_PWXVolumeSource_To_v1_PWXVolumeSource(in *api.PWXVolumeSource, out *PWXVolumeSource, s conversion.Scope) error {
-	return autoConvert_api_PWXVolumeSource_To_v1_PWXVolumeSource(in, out, s)
-}
-
 func autoConvert_v1_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, out *api.PersistentVolume, s conversion.Scope) error {
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -4278,14 +4250,14 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	} else {
 		out.AzureDisk = nil
 	}
-	if in.PWXVolume != nil {
-		in, out := &in.PWXVolume, &out.PWXVolume
-		*out = new(api.PWXVolumeSource)
-		if err := Convert_v1_PWXVolumeSource_To_api_PWXVolumeSource(*in, *out, s); err != nil {
+	if in.PortworxVolume != nil {
+		in, out := &in.PortworxVolume, &out.PortworxVolume
+		*out = new(api.PortworxVolumeSource)
+		if err := Convert_v1_PortworxVolumeSource_To_api_PortworxVolumeSource(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
-		out.PWXVolume = nil
+		out.PortworxVolume = nil
 	}
 	return nil
 }
@@ -4439,14 +4411,14 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 	} else {
 		out.AzureDisk = nil
 	}
-	if in.PWXVolume != nil {
-		in, out := &in.PWXVolume, &out.PWXVolume
-		*out = new(PWXVolumeSource)
-		if err := Convert_api_PWXVolumeSource_To_v1_PWXVolumeSource(*in, *out, s); err != nil {
+	if in.PortworxVolume != nil {
+		in, out := &in.PortworxVolume, &out.PortworxVolume
+		*out = new(PortworxVolumeSource)
+		if err := Convert_api_PortworxVolumeSource_To_v1_PortworxVolumeSource(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
-		out.PWXVolume = nil
+		out.PortworxVolume = nil
 	}
 	return nil
 }
@@ -5370,6 +5342,26 @@ func autoConvert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSp
 		return err
 	}
 	return nil
+}
+
+func autoConvert_v1_PortworxVolumeSource_To_api_PortworxVolumeSource(in *PortworxVolumeSource, out *api.PortworxVolumeSource, s conversion.Scope) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	return nil
+}
+
+func Convert_v1_PortworxVolumeSource_To_api_PortworxVolumeSource(in *PortworxVolumeSource, out *api.PortworxVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_PortworxVolumeSource_To_api_PortworxVolumeSource(in, out, s)
+}
+
+func autoConvert_api_PortworxVolumeSource_To_v1_PortworxVolumeSource(in *api.PortworxVolumeSource, out *PortworxVolumeSource, s conversion.Scope) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	return nil
+}
+
+func Convert_api_PortworxVolumeSource_To_v1_PortworxVolumeSource(in *api.PortworxVolumeSource, out *PortworxVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_PortworxVolumeSource_To_v1_PortworxVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_Preconditions_To_api_Preconditions(in *Preconditions, out *api.Preconditions, s conversion.Scope) error {
@@ -6967,14 +6959,14 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	} else {
 		out.AzureDisk = nil
 	}
-	if in.PWXVolume != nil {
-		in, out := &in.PWXVolume, &out.PWXVolume
-		*out = new(api.PWXVolumeSource)
-		if err := Convert_v1_PWXVolumeSource_To_api_PWXVolumeSource(*in, *out, s); err != nil {
+	if in.PortworxVolume != nil {
+		in, out := &in.PortworxVolume, &out.PortworxVolume
+		*out = new(api.PortworxVolumeSource)
+		if err := Convert_v1_PortworxVolumeSource_To_api_PortworxVolumeSource(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
-		out.PWXVolume = nil
+		out.PortworxVolume = nil
 	}
 	return nil
 }
@@ -7182,14 +7174,14 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	} else {
 		out.AzureDisk = nil
 	}
-	if in.PWXVolume != nil {
-		in, out := &in.PWXVolume, &out.PWXVolume
-		*out = new(PWXVolumeSource)
-		if err := Convert_api_PWXVolumeSource_To_v1_PWXVolumeSource(*in, *out, s); err != nil {
+	if in.PortworxVolume != nil {
+		in, out := &in.PortworxVolume, &out.PortworxVolume
+		*out = new(PortworxVolumeSource)
+		if err := Convert_api_PortworxVolumeSource_To_v1_PortworxVolumeSource(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
-		out.PWXVolume = nil
+		out.PortworxVolume = nil
 	}
 	return nil
 }
