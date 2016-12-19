@@ -576,6 +576,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
 			printCinderVolumeSource(volume.VolumeSource.Cinder, out)
 		case volume.VolumeSource.PhotonPersistentDisk != nil:
 			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, out)
+		case volume.VolumeSource.PortworxVolume != nil:
+			printPortworxVolumeSource(volume.VolumeSource.PortworxVolume, out)
 		default:
 			fmt.Fprintf(out, "  <unknown>\n")
 		}
@@ -643,8 +645,19 @@ func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, out io.Writer) {
 		quobyte.Registry, quobyte.Volume, quobyte.ReadOnly)
 }
 
+<<<<<<< HEAD
 func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, out io.Writer) {
 	fmt.Fprintf(out, "    Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
+=======
+func printPortworxVolumeSource(pwxVolume *api.PortworxVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tPortworxVolume (a Portworx Persistent Volume resource)\n"+
+		"    VolumeID:\t%v\n",
+		pwxVolume.VolumeID)
+}
+
+func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
+>>>>>>> 77eb543... Changes for k8s configuration and examples for portworx volumes.
 		"    TargetPortal:\t%v\n"+
 		"    IQN:\t%v\n"+
 		"    Lun:\t%v\n"+
@@ -785,7 +798,13 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 		case pv.Spec.AzureDisk != nil:
 			printAzureDiskVolumeSource(pv.Spec.AzureDisk, out)
 		case pv.Spec.PhotonPersistentDisk != nil:
+<<<<<<< HEAD
 			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, out)
+=======
+			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, w)
+		case pv.Spec.PortworxVolume != nil:
+			printPortworxVolumeSource(pv.Spec.PortworxVolume, w)
+>>>>>>> 77eb543... Changes for k8s configuration and examples for portworx volumes.
 		}
 
 		if events != nil {
