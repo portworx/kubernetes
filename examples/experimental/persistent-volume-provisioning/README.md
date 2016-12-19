@@ -63,6 +63,30 @@ parameters:
 
 * `diskformat`: `thin`, `zeroedthick` and `eagerzeroedthick`. See vSphere docs for details. Default: `"thin"`.
 
+#### Portworx Volume
+
+```yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: portworx-io-priority-high
+provisioner: kubernetes.io/portworx-volume
+parameters:
+  repl: "1"
+  snapshot_interval:   "70"
+  io_priority:  "high"
+
+```
+
+*  `fs`: filesystem to be laid out: none|xfs|ext4 (default: `ext4`)
+*  `block_size`: block size in Kbytes (default: `32`)
+*  `repl`: replication factor [1..3] (default: `1`)
+*  `io_priority`: IO Priority: [high|medium|low] (default: `low`)
+*  `snapshot_interval`: snapshot interval in minutes, 0 disables snaps (default: `0`)
+*  `aggregation_level`: specifies the number of parts the volume can be aggregated from (default: `0`)
+```
+
+For a complete example refer Portworx Volume docs
 
 #### GLUSTERFS
 
