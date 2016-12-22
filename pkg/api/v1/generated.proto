@@ -2625,14 +2625,14 @@ message PodTemplateSpec {
   optional PodSpec spec = 2;
 }
 
-// Represents a Portworx volume resource.
+// PortworxVolumeSource represents a Portworx volume resource.
 message PortworxVolumeSource {
-  // VolumeID is the id of the volume
+  // VolumeID uniquely identifies a Portworx volume
   optional string volumeID = 1;
 
-  // Filesystem type to mount
+  // FSType represents the filesystem type to mount
   // Must be a filesystem type supported by the host operating system.
-  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
   optional string fsType = 2;
 }
 
