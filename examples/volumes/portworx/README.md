@@ -1,6 +1,6 @@
 # Portworx Volume
 
-  - Portworx
+  - [Portworx](#portworx)
   - [Prerequisites](#prerequisites)
   - [Examples](#examples)
     - [Using Pre-provisioned Portworx Volumes](#pre-provisioned)
@@ -12,7 +12,7 @@
 ## Portworx
 
 [Portworx](http://www.portworx.com) can be used as a storage provider for your Kubernetes cluster. Portworx pools your servers capacity and turns your servers
-or cloud instances into converged, highly available compute and storage nodes 
+or cloud instances into converged, highly available compute and storage nodes
 
 ## Prerequisites
 
@@ -25,60 +25,57 @@ The following examples assumes that you already have a running Kubernetes cluste
 
 ### Using Pre-provisioned Portworx Volumes
 
-  
   Create a Volume using Portworx CLI.
+  On one of the Kubernetes nodes with Portworx installed run the following command
 
-      On one of the Kubernetes nodes with Portworx installed run the
-      following command
-
-      ```shell
-      /opt/pwx/bin/pxctl volume create <vol-id> --size <size> --fs <fs-type>
-      ```
+  ```shell
+  /opt/pwx/bin/pxctl volume create <vol-id> --size <size> --fs <fs-type>
+  ```
 
 #### Running Pods
-  
+
    Create Pod which uses Portworx Volumes
 
-     Example spec:
+   Example spec:
 
-     ```yaml
-     apiVersion: v1
-     kind: Pod
-     metadata:
-      name: test-portworx-volume-pod
-     spec:
-       containers:
-       - image: gcr.io/google_containers/test-webserver
-         name: test-container
-         volumeMounts:
-         - mountPath: /test-portworx-volume
-           name: test-volume
-       volumes:
-       - name: test-volume
-         # This Portworx volume must already exist.
-         portworxVolume:
-           volumeID: "<vol-id>"
-	   fsType: "<fs-type>"
-     ```
+   ```yaml
+   apiVersion: v1
+   kind: Pod
+   metadata:
+    name: test-portworx-volume-pod
+   spec:
+     containers:
+     - image: gcr.io/google_containers/test-webserver
+       name: test-container
+       volumeMounts:
+       - mountPath: /test-portworx-volume
+         name: test-volume
+     volumes:
+     - name: test-volume
+       # This Portworx volume must already exist.
+       portworxVolume:
+         volumeID: "<vol-id>"
+         fsType: "<fs-type>"
+   ```
 
-     [Download example](portworx-volume-pod.yaml?raw=true)
+   [Download example](portworx-volume-pod.yaml?raw=true)
 
-     Make sure to replace <vol-id> and <fs-type> in the above spec with
-     the ones that you used while creating the volume.
+   Make sure to replace <vol-id> and <fs-type> in the above spec with
+   the ones that you used while creating the volume.
 
-     Creating the pod:
+   Create the Pod.
 
-     ``` bash
-     $ kubectl create -f examples/volumes/portworx/portworx-volume-pod.yaml
-     ```
+   ``` bash
+   $ kubectl create -f examples/volumes/portworx/portworx-volume-pod.yaml
+   ```
 
-     Verify that pod is running:
+   Verify that pod is running:
 
-     ```bash
-     $ kubectl.sh get pods
-       NAME                       READY     STATUS    RESTARTS   AGE
-       test-portworx-volume-pod   1/1       Running   0          16s
-     ```
+   ```bash
+   $ kubectl.sh get pods
+     NAME                       READY     STATUS    RESTARTS   AGE
+     test-portworx-volume-pod   1/1       Running   0          16s
+   ```
 
 #### Persistent Volumes
 
@@ -213,131 +210,131 @@ The following examples assumes that you already have a running Kubernetes cluste
 ### Using Dynamic Provisioning
 
 Using Dynamic Provisioning and Storage Classes you don't need to
-create Portworx volumes out of band and they will be created automatically.  
+create Portworx volumes out of band and they will be created automatically.
 
 #### Storage Class
 
   Using Storage Classes objects an admin can define the different classes of Portworx Volumes
   that are offered in a cluster. Following are the different parameters that can be used to define a Portworx
   Storage Class
+  
+  * `fs`: filesystem to be laid out: none|xfs|ext4 (default: `ext4`)
+  * `block_size`: block size in Kbytes (default: `32`)
+  * `repl`: replication factor [1..3] (default: `1`)
+  * `io_priority`: IO Priority: [high|medium|low] (default: `low`)
+  * `snap_interval`: snapshot interval in minutes, 0 disables snaps (default: `0`)
+  * `aggregation_level`: specifies the number of parts the volume can be aggregated from (default: `0`)
+  * `ephemeral`: ephemeral storage [true|false] (default `false`)
 
-  fs: filesystem to be laid out: none|xfs|ext4 (default: "ext4")
-  block_size: block size in Kbytes (default: 32)
-  repl: replication factor [1..3] (default: 1)
-  io_priority: IO Priority: [high|medium|low] (default: "low")
-  snapshot_interval: snapshot interval in minutes, 0 disables snaps (default: 0)
-  aggregation_level: specifies the number of parts the volume can be aggregated from (default: 0)
 
   1. Create Storage Class.
 
-      See example:
+     See example:
 
-      ```yaml
-      kind: StorageClass
-      apiVersion: storage.k8s.io/v1beta1
-      metadata:
-        name: portworx-io-priority-high
+     ```yaml
+     kind: StorageClass
+     apiVersion: storage.k8s.io/v1beta1
+     metadata:
+       name: portworx-io-priority-high
      provisioner: kubernetes.io/portworx-volume
      parameters:
        repl: "1"
-       snapshot_interval:   "70"
+       snap_interval:   "70"
        io_priority:  "high"
-      ```
+     ```
 
-    [Download example](portworx-volume-sc-high.yaml?raw=true)
-      
-    Creating the storageclass:
+     [Download example](portworx-volume-sc-high.yaml?raw=true)
 
-      ``` bash
-      $ kubectl create -f examples/volumes/portworx/portworx-volume-sc-high.yaml
-      ```
+     Creating the storageclass:
 
-      Verifying storage class is created:
+     ``` bash
+     $ kubectl create -f examples/volumes/portworx/portworx-volume-sc-high.yaml
+     ```
 
-      ``` bash
-      $ kubectl describe storageclass portworx-io-priority-high
-        Name: 	        portworx-io-priority-high
-        IsDefaultClass:	No
-	Annotations:	<none>
-	Provisioner:	kubernetes.io/portworx-volume
-	Parameters:	io_priority=high,repl=1,snapshot_interval=70
-	No events.
+     Verifying storage class is created:
 
-      ```
+     ``` bash
+     $ kubectl describe storageclass portworx-io-priority-high
+       Name: 	        portworx-io-priority-high
+       IsDefaultClass:	No
+       Annotations:	<none>
+       Provisioner:	kubernetes.io/portworx-volume
+       Parameters:	io_priority=high,repl=1,snapshot_interval=70
+       No events.
+     ```
 
   2. Create Persistent Volume Claim.
 
-      See example:
+     See example:
 
-      ```yaml
-      kind: PersistentVolumeClaim
-      apiVersion: v1
-      metadata:
-        name: pvcsc001
-        annotations:
-          volume.beta.kubernetes.io/storage-class: portworx-io-priority-high
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 2Gi
-      ```
+     ```yaml
+     kind: PersistentVolumeClaim
+     apiVersion: v1
+     metadata:
+       name: pvcsc001
+       annotations:
+         volume.beta.kubernetes.io/storage-class: portworx-io-priority-high
+     spec:
+       accessModes:
+         - ReadWriteOnce
+       resources:
+         requests:
+           storage: 2Gi
+     ```
 
-      [Download example](portworx-volume-pvcsc.yaml?raw=true)
+     [Download example](portworx-volume-pvcsc.yaml?raw=true)
 
-      Creating the persistent volume claim:
+     Creating the persistent volume claim:
 
-      ``` bash
-      $ kubectl create -f examples/volumes/portworx/portworx-volume-pvcsc.yaml
-      ```
+     ``` bash
+     $ kubectl create -f examples/volumes/portworx/portworx-volume-pvcsc.yaml
+     ```
 
-      Verifying persistent volume claim is created:
+     Verifying persistent volume claim is created:
 
-      ``` bash
-      $ kubectl describe pvc pvcsc001
-      Name:	      pvcsc001
-      Namespace:      default
-      StorageClass:   portworx-io-priority-high
-      Status:	      Bound
-      Volume:         pvc-e5578707-c626-11e6-baf6-08002729a32b
-      Labels:	      <none>
-      Capacity:	      2Gi
-      Access Modes:   RWO
-      No Events
-      ```
+     ``` bash
+     $ kubectl describe pvc pvcsc001
+     Name:	      pvcsc001
+     Namespace:      default
+     StorageClass:   portworx-io-priority-high
+     Status:	      Bound
+     Volume:         pvc-e5578707-c626-11e6-baf6-08002729a32b
+     Labels:	      <none>
+     Capacity:	      2Gi
+     Access Modes:   RWO
+     No Events
+     ```
 
-      Persistent Volume is automatically created and is bounded to this pvc.
+     Persistent Volume is automatically created and is bounded to this pvc.
 
-      Verifying persistent volume claim is created:
+     Verifying persistent volume claim is created:
 
-      ``` bash
-
-      $ kubectl describe pv pvc-e5578707-c626-11e6-baf6-08002729a32b
-      Name: 	      pvc-e5578707-c626-11e6-baf6-08002729a32b
-      Labels:         <none>
-      StorageClass:   portworx-io-priority-high
-      Status:	      Bound
-      Claim:	      default/pvcsc001
-      Reclaim Policy: Delete
-      Access Modes:   RWO
-      Capacity:	      2Gi
-      Message:
-      Source:
-          Type:	      PortworxVolume (a Portworx Persistent Volume resource)
-	  VolumeID:   374093969022973811
-      No events.
-      ```
+     ``` bash
+     $ kubectl describe pv pvc-e5578707-c626-11e6-baf6-08002729a32b
+     Name: 	      pvc-e5578707-c626-11e6-baf6-08002729a32b
+     Labels:         <none>
+     StorageClass:   portworx-io-priority-high
+     Status:	      Bound
+     Claim:	      default/pvcsc001
+     Reclaim Policy: Delete
+     Access Modes:   RWO
+     Capacity:	      2Gi
+     Message:
+     Source:
+         Type:	      PortworxVolume (a Portworx Persistent Volume resource)
+	 VolumeID:   374093969022973811
+     No events.
+     ```
 
   3. Create Pod which uses Persistent Volume Claim with storage class.
 
-      See example:
+     See example:
 
-      ```yaml
-      apiVersion: v1
-      kind: Pod
-      metadata:
-        name: pvpod
+     ```yaml
+     apiVersion: v1
+     kind: Pod
+     metadata:
+       name: pvpod
      spec:
        containers:
        - name: test-container
@@ -349,20 +346,25 @@ create Portworx volumes out of band and they will be created automatically.
      - name: test-volume
        persistentVolumeClaim:
          claimName: pvcsc001
-      ```
+     ```
 
-      [Download example](portworx-volume-pvcscpod.yaml?raw=true)
+     [Download example](portworx-volume-pvcscpod.yaml?raw=true)
 
-      Creating the pod:
+     Creating the pod:
 
-      ``` bash
-      $ kubectl create -f examples/volumes/portworx/portworx-volume-pvcscpod.yaml
-      ```
+     ``` bash
+     $ kubectl create -f examples/volumes/portworx/portworx-volume-pvcscpod.yaml
+     ```
 
-      Verifying pod is created:
+     Verifying pod is created:
 
-      ``` bash
-      $ kubectl get pod pvpod
-      NAME      READY     STATUS    RESTARTS   AGE
-      pvpod       1/1     Running   0          48m        
-      ```
+     ``` bash
+     $ kubectl get pod pvpod
+     NAME      READY     STATUS    RESTARTS   AGE
+     pvpod       1/1     Running   0          48m        
+     ```
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/portworx/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

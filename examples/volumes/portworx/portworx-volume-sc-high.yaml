@@ -5,5 +5,5 @@ metadata:
 provisioner: kubernetes.io/portworx-volume
 parameters:
   repl: "1"
-  snapshot_interval:   "70"
+  snap_interval:   "70"
   io_priority:  "high"

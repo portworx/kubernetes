@@ -73,7 +73,7 @@ metadata:
 provisioner: kubernetes.io/portworx-volume
 parameters:
   repl: "1"
-  snapshot_interval:   "70"
+  snap_interval:   "70"
   io_priority:  "high"
 
 ```
@@ -82,8 +82,10 @@ parameters:
 *  `block_size`: block size in Kbytes (default: `32`)
 *  `repl`: replication factor [1..3] (default: `1`)
 *  `io_priority`: IO Priority: [high|medium|low] (default: `low`)
-*  `snapshot_interval`: snapshot interval in minutes, 0 disables snaps (default: `0`)
+*  `snap_interval`: snapshot interval in minutes, 0 disables snaps (default: `0`)
 *  `aggregation_level`: specifies the number of parts the volume can be aggregated from (default: `0`)
+* `ephemeral`: ephemeral storage [true|false] (default `false`)
+
 ```
 
 For a complete example refer Portworx Volume docs
@@ -91,6 +93,7 @@ For a complete example refer Portworx Volume docs
 #### GLUSTERFS
 
 ```yaml
+
 apiVersion: storage.k8s.io/v1beta1
 kind: StorageClass
 metadata:
@@ -104,6 +107,7 @@ parameters:
   secretName: "heketi-secret"
   gidMin: "40000"
   gidMax: "50000"
+
 ```
 
 * `resturl` : Gluster REST service/Heketi service url which provision gluster volumes on demand. The general format should be `IPaddress:Port` and this is a mandatory parameter for GlusterFS dynamic provisioner. If Heketi service is exposed as a routable service in openshift/kubernetes setup, this can have a format similar to
@@ -128,6 +132,7 @@ When the persistent volumes are dynamically provisioned, the Gluster plugin auto
 #### OpenStack Cinder
 
 ```yaml
+
 kind: StorageClass
 apiVersion: storage.k8s.io/v1beta1
 metadata:
@@ -136,6 +141,7 @@ provisioner: kubernetes.io/cinder
 parameters:
   type: fast
   availability: nova
+
 ```
 
 * `type`: [VolumeType](http://docs.openstack.org/admin-guide/dashboard-manage-volumes.html) created in Cinder. Default is empty.
@@ -144,6 +150,7 @@ parameters:
 #### Ceph RBD
 
 ```yaml
+
   apiVersion: storage.k8s.io/v1beta1
   kind: StorageClass
   metadata:
@@ -157,6 +164,7 @@ parameters:
     pool: kube
     userId: kube
     userSecretName: ceph-secret-user
+
 ```
 
 * `monitors`: Ceph monitors, comma delimited. It is required.
@@ -172,6 +180,7 @@ parameters:
 <!-- BEGIN MUNGE: EXAMPLE quobyte/quobyte-storage-class.yaml -->
 
 ```yaml
+
 apiVersion: storage.k8s.io/v1beta1
 kind: StorageClass
 metadata:
@@ -186,6 +195,7 @@ parameters:
     group: "root"
     quobyteConfig: "BASE"
     quobyteTenant: "DEFAULT"
+
 ```
 
 [Download example](quobyte/quobyte-storage-class.yaml?raw=true)
@@ -203,24 +213,31 @@ parameters:
 First create Quobyte admin's Secret in the system namespace. Here the Secret is created in `kube-system`:
 
 ```
+
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/quobyte/quobyte-admin-secret.yaml --namespace=kube-system
+
 ```
 
 Then create the Quobyte storage class:
 
 ```
+
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/quobyte/quobyte-storage-class.yaml
+
 ```
 
 Now create a PVC
 
 ```
+
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.json
+
 ```
 
 Check the created PVC:
 
 ```
+
 $ kubectl describe pvc
 Name:       claim1
 Namespace:      default
@@ -246,17 +263,21 @@ Source:
     Volume:    	kubernetes-dynamic-pvc-bdb97c58-694a-11e6-91b6-080027242396
     ReadOnly:  	false
 No events.
+
 ```
 
 Create a Pod to use the PVC:
 
 ```
+
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/quobyte/example-pod.yaml
+
 ```
 
 #### Azure Disk
 
 ```yaml
+
 kind: StorageClass
 apiVersion: storage.k8s.io/v1beta1
 metadata:
@@ -266,6 +287,7 @@ parameters:
   skuName: Standard_LRS
   location: eastus
   storageAccount: azure_storage_account_name
+
 ```
 
 * `skuName`: Azure storage account Sku tier. Default is empty.
@@ -279,6 +301,7 @@ The annotation `volume.beta.kubernetes.io/storage-class` is used to access this 
 In the future, the storage class may remain in an annotation or become a field on the claim itself.
 
 ```
+
 {
   "kind": "PersistentVolumeClaim",
   "apiVersion": "v1",
@@ -299,6 +322,7 @@ In the future, the storage class may remain in an annotation or become a field o
     }
   }
 }
+
 ```
 
 ### Sample output
@@ -312,6 +336,7 @@ and automatically bound to the claim requesting storage.
 
 
 ```
+
 $ kubectl get pv
 
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/gce-pd.yaml
@@ -329,10 +354,12 @@ NAME      LABELS    STATUS    VOLUME                                     CAPACIT
 claim1    <none>    Bound     pvc-bb6d2f0c-534c-11e6-9348-42010af00002   3Gi        RWO           7s
 
 # delete the claim to release the volume
+
 $ kubectl delete pvc claim1
 persistentvolumeclaim "claim1" deleted
 
 # the volume is deleted in response to being release of its claim
+
 $ kubectl get pv
 
 ```
@@ -351,40 +378,50 @@ For this to work you must have a functional Ceph cluster, and the `rbd` command 
 First we must identify the Ceph client admin key. This is usually found in `/etc/ceph/ceph.client.admin.keyring` on your Ceph cluster nodes. The file will look something like this:
 
 ```
+
 [client.admin]
   key = AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==
   auid = 0
   caps mds = "allow"
   caps mon = "allow *"
   caps osd = "allow *"
+
 ```
 
 From the key value, we will create a secret. We must create the Ceph admin Secret in the namespace defined in our `StorageClass`. In this example we've set the namespace to `kube-system`.
 
 ```
+
 $ kubectl create secret generic ceph-secret-admin --from-literal=key='AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==' --namespace=kube-system --type=kubernetes.io/rbd
+
 ```
 
 Now modify `examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml` to reflect your environment, particularly the `monitors` field.  We are now ready to create our RBD Storage Class:
 
 ```
+
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml
+
 ```
 
 The kube-controller-manager is now able to provision storage, however we still need to be able to map the RBD volume to a node. Mapping should be done with a non-privileged key, if you have existing users you can get all keys by running `ceph auth list` on your Ceph cluster with the admin key. For this example we will create a new user and pool.
 
 ```
+
 $ ceph osd pool create kube 512
 $ ceph auth get-or-create client.kube mon 'allow r' osd 'allow rwx pool=kube'
 [client.kube]
 	key = AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==
+
 ```
 
 This key will be made into a secret, just like the admin secret. However this user secret will need to be created in every namespace where you intend to consume RBD volumes provisioned in our example storage class. Let's create a namespace called `myns`, and create the user secret in that namespace.
 
 ```
+
 kubectl create namespace myns
 kubectl create secret generic ceph-secret-user --from-literal=key='AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==' --namespace=myns --type=kubernetes.io/rbd
+
 ```
 
 You are now ready to provision and use RBD storage.
@@ -394,12 +431,15 @@ You are now ready to provision and use RBD storage.
 With the storageclass configured, let's create a PVC in our example namespace, `myns`:
 
 ```
+
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.json --namespace=myns
+
 ```
 
 Eventually the PVC creation will result in a PV and RBD volume to match:
 
 ```
+
 $ kubectl describe pvc --namespace=myns
 Name:		claim1
 Namespace:	myns
@@ -423,28 +463,37 @@ Source:
     Type:		RBD (a Rados Block Device mount on the host that shares a pod's lifetime)
     CephMonitors:	[127.0.0.1:6789]
     RBDImage:		kubernetes-dynamic-pvc-1cfb1862-664b-11e6-9a5d-90b11c09520d
-    FSType:		
+    FSType:
     RBDPool:		kube
     RadosUser:		kube
     Keyring:		/etc/ceph/keyring
     SecretRef:		&{ceph-secret-user}
     ReadOnly:		false
 No events.
+
 ```
 
 With our storage provisioned, we can now create a Pod to use the PVC:
 
 ```
+
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/pod.yaml --namespace=myns
+
 ```
 
 Now our pod has an RBD mount!
 
 ```
+
 $ export PODNAME=`kubectl get pod --selector='role=server' --namespace=myns --output=template --template="{{with index .items 0}}{{.metadata.name}}{{end}}"`
 $ kubectl exec -it $PODNAME --namespace=myns -- df -h | grep rbd
 /dev/rbd1       2.9G  4.5M  2.8G   1% /var/lib/www/html
+
 ```
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/experimental/persistent-volume-provisioning/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/experimental/persistent-volume-provisioning/README.md?pixel)]()
