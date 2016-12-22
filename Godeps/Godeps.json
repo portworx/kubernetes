@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.7",
+	"GoVersion": "go1.6",
 	"GodepVersion": "v74",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
@@ -1513,19 +1513,27 @@
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api",
-			"Rev": "013a33c73be2e3beceb82a51e94967f340ffb868"
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api/client",
-			"Rev": "013a33c73be2e3beceb82a51e94967f340ffb868"
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api/client/volume",
-			"Rev": "013a33c73be2e3beceb82a51e94967f340ffb868"
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api/spec",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/pkg/units",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/volume",
-			"Rev": "013a33c73be2e3beceb82a51e94967f340ffb868"
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
 		},
 		{
 			"ImportPath": "github.com/lpabon/godbc",

@@ -9,15 +9,19 @@ import (
 
 // Strings for VolumeSpec
 const (
+	Name                 = "name"
 	SpecEphemeral        = "ephemeral"
 	SpecShared           = "shared"
 	SpecSize             = "size"
+	SpecScale            = "scale"
 	SpecFilesystem       = "fs"
 	SpecBlockSize        = "block_size"
 	SpecHaLevel          = "repl"
 	SpecPriority         = "io_priority"
 	SpecSnapshotInterval = "snap_interval"
+	SpecAggregationLevel = "aggregation_level"
 	SpecDedupe           = "dedupe"
+	SpecPassphrase       = "passphrase"
 )
 
 // OptionKey specifies a set of recognized query params.
