@@ -87,7 +87,7 @@ func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAcc
 
 type fakePortworxManager struct {
 	attachCalled bool
-	mountCalled bool
+	mountCalled  bool
 }
 
 func (fake *fakePortworxManager) AttachVolume(b *portworxVolumeMounter) (string, error) {
@@ -95,7 +95,7 @@ func (fake *fakePortworxManager) AttachVolume(b *portworxVolumeMounter) (string,
 	return "", nil
 }
 
-func (fake *fakePortworxManager) DetachVolume(c *portworxVolumeUnmounter, deviceName string) error {
+func (fake *fakePortworxManager) DetachVolume(c *portworxVolumeUnmounter) error {
 	return nil
 }
 
@@ -104,10 +104,9 @@ func (fake *fakePortworxManager) MountVolume(b *portworxVolumeMounter, mountPath
 	return nil
 }
 
-func (fake *fakePortworxManager) UnmountVolume(c *portworxVolumeUnmounter, deviceName, mountPath string) error {
+func (fake *fakePortworxManager) UnmountVolume(c *portworxVolumeUnmounter, mountPath string) error {
 	return nil
 }
-
 
 func (fake *fakePortworxManager) CreateVolume(c *portworxVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error) {
 	labels = make(map[string]string)

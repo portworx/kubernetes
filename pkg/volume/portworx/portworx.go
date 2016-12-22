@@ -21,8 +21,8 @@ import (
 	"os"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -172,7 +172,6 @@ func (plugin *portworxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath st
 	return volume.NewSpecFromVolume(portworxVolume), nil
 }
 
-
 func getVolumeSource(
 	spec *volume.Spec) (*v1.PortworxVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.PortworxVolume != nil {
@@ -194,11 +193,11 @@ type portworxManager interface {
 	// Attach a volume
 	AttachVolume(mounter *portworxVolumeMounter) (string, error)
 	// Detach a volume
-	DetachVolume(unmounter *portworxVolumeUnmounter, deviceName string) error
+	DetachVolume(unmounter *portworxVolumeUnmounter) error
 	// Mount a volume
 	MountVolume(mounter *portworxVolumeMounter, mountDir string) error
 	// Unmount a volume
-	UnmountVolume(unmounter *portworxVolumeUnmounter, deviceName, mountDir string) error
+	UnmountVolume(unmounter *portworxVolumeUnmounter, mountDir string) error
 }
 
 // portworxVolume volumes are portworx block devices
@@ -252,7 +251,6 @@ func (b *portworxVolumeMounter) SetUp(fsGroup *int64) error {
 // SetUpAt attaches the disk and bind mounts to the volume path.
 func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
-
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("Portworx Volume set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -272,7 +270,6 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return err
 	}
-
 
 	if err := b.manager.MountVolume(b, dir); err != nil {
 		return err
@@ -312,18 +309,12 @@ func (c *portworxVolumeUnmounter) TearDownAt(dir string) error {
 		return os.Remove(dir)
 	}
 
-	deviceName, _, err := mount.GetDeviceNameFromMount(c.mounter, dir)
-	if err != nil {
-		glog.Errorf("Failed to get reference count and device name for volume: %s", dir)
-		return err
-	}
-	
 	// Unmount the bind-mount inside this pod
-	if err := c.manager.UnmountVolume(c, deviceName, dir); err != nil {
+	if err := c.manager.UnmountVolume(c, dir); err != nil {
 		return err
 	}
 
-	if err := c.manager.DetachVolume(c, deviceName); err != nil {
+	if err := c.manager.DetachVolume(c); err != nil {
 		return err
 	}
 
@@ -374,7 +365,7 @@ func (c *portworxVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				PortworxVolume: &v1.PortworxVolumeSource{
-					VolumeID:  volumeID,
+					VolumeID: volumeID,
 				},
 			},
 		},

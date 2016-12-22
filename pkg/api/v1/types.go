@@ -1072,13 +1072,13 @@ type AzureDiskVolumeSource struct {
 	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
 }
 
-// Represents a Portworx volume resource.
+// PortworxVolumeSource represents a Portworx volume resource.
 type PortworxVolumeSource struct {
-	// VolumeID is the id of the volume
+	// VolumeID uniquely identifies a Portworx volume
 	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
-	// Filesystem type to mount
+	// FSType represents the filesystem type to mount
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
 }
 

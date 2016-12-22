@@ -286,7 +286,7 @@ type VolumeSource struct {
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource
-	AzureDisk *AzureDiskVolumeSource
+	AzureDisk     *AzureDiskVolumeSource
 	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
 	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
@@ -954,13 +954,13 @@ type PhotonPersistentDiskVolumeSource struct {
 	FSType string
 }
 
-// Represents a Portworx volume resource.
+// PortworxVolumeSource represents a Portworx volume resource.
 type PortworxVolumeSource struct {
-	// VolumeID is the id of the volume
+	// VolumeID uniquely identifies a Portworx volume
 	VolumeID string `json:"volumeID"`
-	// Filesystem type to mount
+	// FSType represents the filesystem type to mount
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
 	FSType string `json:"fsType,omitempty"`
 }
