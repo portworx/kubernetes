@@ -2045,6 +2045,10 @@ message PersistentVolumeSource {
 
   // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 17;
+
+  // PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+  // +optional
+  optional PortworxVolumeSource portworxVolume = 18;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -2653,6 +2657,17 @@ message PodTemplateSpec {
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
   // +optional
   optional PodSpec spec = 2;
+}
+
+// PortworxVolumeSource represents a Portworx volume resource.
+message PortworxVolumeSource {
+  // VolumeID uniquely identifies a Portworx volume
+  optional string volumeID = 1;
+
+  // FSType represents the filesystem type to mount
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
+  optional string fsType = 2;
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -3583,6 +3598,10 @@ message VolumeSource {
 
   // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
+
+  // PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+  // +optional
+  optional PortworxVolumeSource portworxVolume = 24;
 }
 
 // Represents a vSphere volume resource.
