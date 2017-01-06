@@ -17083,6 +17083,7 @@ go_test(
 )
 
 go_library(
+<<<<<<< HEAD
     name = "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme",
     srcs = [
         "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme/doc.go",
@@ -17095,10 +17096,23 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1",
+=======
+    name = "github.com/libopenstorage/openstorage/api",
+    srcs = [
+        "github.com/libopenstorage/openstorage/api/api.go",
+        "github.com/libopenstorage/openstorage/api/api.pb.go",
+        "github.com/libopenstorage/openstorage/api/status.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/protobuf/proto",
+        "//vendor:go.pedge.io/pb/go/google/protobuf",
+>>>>>>> Godeps update for Portworx Volume Driver
     ],
 )
 
 go_library(
+<<<<<<< HEAD
     name = "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/scheme",
     srcs = [
         "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/scheme/doc.go",
@@ -17114,4 +17128,72 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration/install",
     ],
+=======
+    name = "github.com/libopenstorage/openstorage/api/client",
+    srcs = [
+        "github.com/libopenstorage/openstorage/api/client/client.go",
+        "github.com/libopenstorage/openstorage/api/client/request.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/libopenstorage/openstorage/api/client/volume",
+    srcs = [
+        "github.com/libopenstorage/openstorage/api/client/volume/client.go",
+        "github.com/libopenstorage/openstorage/api/client/volume/volume.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/libopenstorage/openstorage/api",
+        "//vendor:github.com/libopenstorage/openstorage/api/client",
+        "//vendor:github.com/libopenstorage/openstorage/volume",
+    ],
+)
+
+go_library(
+    name = "github.com/libopenstorage/openstorage/api/spec",
+    srcs = ["github.com/libopenstorage/openstorage/api/spec/spec_handler.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/libopenstorage/openstorage/api",
+        "//vendor:github.com/libopenstorage/openstorage/pkg/units",
+    ],
+)
+
+go_library(
+    name = "github.com/libopenstorage/openstorage/pkg/units",
+    srcs = ["github.com/libopenstorage/openstorage/pkg/units/units.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/libopenstorage/openstorage/volume",
+    srcs = [
+        "github.com/libopenstorage/openstorage/volume/volume.go",
+        "github.com/libopenstorage/openstorage/volume/volume_driver_registry.go",
+        "github.com/libopenstorage/openstorage/volume/volume_not_supported.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/libopenstorage/openstorage/api"],
+)
+
+go_library(
+    name = "go.pedge.io/pb/go/google/protobuf",
+    srcs = [
+        "go.pedge.io/pb/go/google/protobuf/any.pb.go",
+        "go.pedge.io/pb/go/google/protobuf/api.pb.go",
+        "go.pedge.io/pb/go/google/protobuf/duration.pb.go",
+        "go.pedge.io/pb/go/google/protobuf/empty.pb.go",
+        "go.pedge.io/pb/go/google/protobuf/field_mask.pb.go",
+        "go.pedge.io/pb/go/google/protobuf/protobuf.gen.go",
+        "go.pedge.io/pb/go/google/protobuf/source_context.pb.go",
+        "go.pedge.io/pb/go/google/protobuf/struct.pb.go",
+        "go.pedge.io/pb/go/google/protobuf/timestamp.pb.go",
+        "go.pedge.io/pb/go/google/protobuf/type.pb.go",
+        "go.pedge.io/pb/go/google/protobuf/wrappers.pb.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/golang/protobuf/proto"],
+>>>>>>> Godeps update for Portworx Volume Driver
 )
