@@ -22,8 +22,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -175,7 +176,7 @@ func (plugin *portworxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath st
 func getVolumeSource(
 	spec *volume.Spec) (*v1.PortworxVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.PortworxVolume != nil {
-		return spec.Volume.PortworxVolume, spec.ReadOnly, nil
+		return spec.Volume.PortworxVolume, spec.Volume.PortworxVolume.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.PortworxVolume != nil {
 		return spec.PersistentVolume.Spec.PortworxVolume, spec.ReadOnly, nil
@@ -350,7 +351,7 @@ func (c *portworxVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   c.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
