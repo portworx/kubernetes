@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,12 +22,16 @@ import (
 	"path"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+)
+
+const (
+	PortworxTestVolume = "portworx-test-vol"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -46,10 +50,10 @@ func TestCanSupport(t *testing.T) {
 	if plug.GetPluginName() != "kubernetes.io/portworx-volume" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
-	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{PortworxVolume: &v1.PortworxVolumeSource{}}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{PortworxVolume: &api.PortworxVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{PortworxVolume: &v1.PortworxVolumeSource{}}}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{PortworxVolume: &api.PortworxVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -68,15 +72,18 @@ func TestGetAccessModes(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	if !contains(plug.GetAccessModes(), v1.ReadWriteOnce) {
-		t.Errorf("Expected to support AccessModeTypes:  %s", v1.ReadWriteOnce)
+	if !contains(plug.GetAccessModes(), api.ReadWriteOnce) {
+		t.Errorf("Expected to support AccessModeTypes:  %s", api.ReadWriteOnce)
 	}
-	if contains(plug.GetAccessModes(), v1.ReadOnlyMany) {
-		t.Errorf("Expected not to support AccessModeTypes:  %s", v1.ReadOnlyMany)
+	if !contains(plug.GetAccessModes(), api.ReadWriteMany) {
+		t.Errorf("Expected to support AccessModeTypes:  %s", api.ReadWriteMany)
+	}
+	if contains(plug.GetAccessModes(), api.ReadOnlyMany) {
+		t.Errorf("Expected not to support AccessModeTypes:  %s", api.ReadOnlyMany)
 	}
 }
 
-func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
 			return true
@@ -111,11 +118,11 @@ func (fake *fakePortworxManager) UnmountVolume(c *portworxVolumeUnmounter, mount
 func (fake *fakePortworxManager) CreateVolume(c *portworxVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error) {
 	labels = make(map[string]string)
 	labels["fakeportworxmanager"] = "yes"
-	return "portworx-test-vol", 100, labels, nil
+	return PortworxTestVolume, 100, labels, nil
 }
 
 func (fake *fakePortworxManager) DeleteVolume(cd *portworxVolumeDeleter) error {
-	if cd.volumeID != "portworx-test-vol" {
+	if cd.volumeID != PortworxTestVolume {
 		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.volumeID)
 	}
 	return nil
@@ -134,11 +141,11 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &v1.Volume{
+	spec := &api.Volume{
 		Name: "vol1",
-		VolumeSource: v1.VolumeSource{
-			PortworxVolume: &v1.PortworxVolumeSource{
-				VolumeID: "portworx-test-vol",
+		VolumeSource: api.VolumeSource{
+			PortworxVolume: &api.PortworxVolumeSource{
+				VolumeID: PortworxTestVolume,
 				FSType:   "ext4",
 			},
 		},
@@ -186,8 +193,8 @@ func TestPlugin(t *testing.T) {
 
 	// Test Provisioner
 	options := volume.VolumeOptions{
-		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
-		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+		PVC: volumetest.CreateTestPVC("100Gi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 
 	provisioner, err := plug.(*portworxVolumePlugin).newProvisionerInternal(options, &fakePortworxManager{})
@@ -196,12 +203,12 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() failed: %v", err)
 	}
 
-	if persistentSpec.Spec.PersistentVolumeSource.PortworxVolume.VolumeID != "portworx-test-vol" {
+	if persistentSpec.Spec.PersistentVolumeSource.PortworxVolume.VolumeID != PortworxTestVolume {
 		t.Errorf("Provision() returned unexpected volume ID: %s", persistentSpec.Spec.PersistentVolumeSource.PortworxVolume.VolumeID)
 	}
-	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
+	cap := persistentSpec.Spec.Capacity[api.ResourceStorage]
 	size := cap.Value()
-	if size != 1024*1024*1024*100 {
+	if size != 100*1024*1024*1024 {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
 	}
 

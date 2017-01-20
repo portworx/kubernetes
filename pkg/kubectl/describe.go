@@ -645,19 +645,8 @@ func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, out io.Writer) {
 		quobyte.Registry, quobyte.Volume, quobyte.ReadOnly)
 }
 
-<<<<<<< HEAD
 func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, out io.Writer) {
 	fmt.Fprintf(out, "    Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
-=======
-func printPortworxVolumeSource(pwxVolume *api.PortworxVolumeSource, w *PrefixWriter) {
-	w.Write(LEVEL_2, "Type:\tPortworxVolume (a Portworx Persistent Volume resource)\n"+
-		"    VolumeID:\t%v\n",
-		pwxVolume.VolumeID)
-}
-
-func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w *PrefixWriter) {
-	w.Write(LEVEL_2, "Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
->>>>>>> 77eb543... Changes for k8s configuration and examples for portworx volumes.
 		"    TargetPortal:\t%v\n"+
 		"    IQN:\t%v\n"+
 		"    Lun:\t%v\n"+
@@ -665,6 +654,12 @@ func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w *PrefixWriter) {
 		"    FSType:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly)
+}
+
+func printPortworxVolumeSource(pwxVolume *api.PortworxVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "Type:\tPortworxVolume (a Portworx Volume resource)\n"+
+		"    VolumeID:\t%v\n",
+		pwxVolume.VolumeID)
 }
 
 func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, out io.Writer) {
@@ -798,13 +793,9 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 		case pv.Spec.AzureDisk != nil:
 			printAzureDiskVolumeSource(pv.Spec.AzureDisk, out)
 		case pv.Spec.PhotonPersistentDisk != nil:
-<<<<<<< HEAD
 			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, out)
-=======
-			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, w)
 		case pv.Spec.PortworxVolume != nil:
-			printPortworxVolumeSource(pv.Spec.PortworxVolume, w)
->>>>>>> 77eb543... Changes for k8s configuration and examples for portworx volumes.
+			printPortworxVolumeSource(pv.Spec.PortworxVolume, out)
 		}
 
 		if events != nil {
