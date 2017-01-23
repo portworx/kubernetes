@@ -215,19 +215,19 @@ parameters:
 First create Quobyte admin's Secret in the system namespace. Here the Secret is created in `kube-system`:
 
 ```
-$ kubectl create -f examples/persistent-volume-provisioning/quobyte/quobyte-admin-secret.yaml --namespace=kube-system
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/quobyte/quobyte-admin-secret.yaml --namespace=kube-system
 ```
 
 Then create the Quobyte storage class:
 
 ```
-$ kubectl create -f examples/persistent-volume-provisioning/quobyte/quobyte-storage-class.yaml
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/quobyte/quobyte-storage-class.yaml
 ```
 
 Now create a PVC
 
 ```
-$ kubectl create -f examples/persistent-volume-provisioning/claim1.json
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.json
 ```
 
 Check the created PVC:
@@ -263,7 +263,7 @@ No events.
 Create a Pod to use the PVC:
 
 ```
-$ kubectl create -f examples/persistent-volume-provisioning/quobyte/example-pod.yaml
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/quobyte/example-pod.yaml
 ```
 
 #### Azure Disk
@@ -326,10 +326,10 @@ and automatically bound to the claim requesting storage.
 ```
 $ kubectl get pv
 
-$ kubectl create -f examples/persistent-volume-provisioning/gce-pd.yaml
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/gce-pd.yaml
 storageclass "slow" created
 
-$ kubectl create -f examples/persistent-volume-provisioning/claim1.json
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.json
 persistentvolumeclaim "claim1" created
 
 $ kubectl get pv
@@ -377,10 +377,10 @@ From the key value, we will create a secret. We must create the Ceph admin Secre
 $ kubectl create secret generic ceph-secret-admin --from-literal=key='AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==' --namespace=kube-system --type=kubernetes.io/rbd
 ```
 
-Now modify `examples/persistent-volume-provisioning/rbd/rbd-storage-class.yaml` to reflect your environment, particularly the `monitors` field.  We are now ready to create our RBD Storage Class:
+Now modify `examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml` to reflect your environment, particularly the `monitors` field.  We are now ready to create our RBD Storage Class:
 
 ```
-$ kubectl create -f examples/persistent-volume-provisioning/rbd/rbd-storage-class.yaml
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml
 ```
 
 The kube-controller-manager is now able to provision storage, however we still need to be able to map the RBD volume to a node. Mapping should be done with a non-privileged key, if you have existing users you can get all keys by running `ceph auth list` on your Ceph cluster with the admin key. For this example we will create a new user and pool.
@@ -406,7 +406,7 @@ You are now ready to provision and use RBD storage.
 With the storageclass configured, let's create a PVC in our example namespace, `myns`:
 
 ```
-$ kubectl create -f examples/persistent-volume-provisioning/claim1.json --namespace=myns
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.json --namespace=myns
 ```
 
 Eventually the PVC creation will result in a PV and RBD volume to match:
@@ -447,7 +447,7 @@ No events.
 With our storage provisioned, we can now create a Pod to use the PVC:
 
 ```
-$ kubectl create -f examples/persistent-volume-provisioning/rbd/pod.yaml --namespace=myns
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/pod.yaml --namespace=myns
 ```
 
 Now our pod has an RBD mount!
@@ -458,6 +458,8 @@ $ kubectl exec -it $PODNAME --namespace=myns -- df -h | grep rbd
 /dev/rbd1       2.9G  4.5M  2.8G   1% /var/lib/www/html
 ```
 
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/persistent-volume-provisioning/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/experimental/persistent-volume-provisioning/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
