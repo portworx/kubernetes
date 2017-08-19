@@ -49,7 +49,7 @@ type PortworxVolumeUtil struct {
 
 // CreateVolume creates a Portworx volume.
 func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (string, int, map[string]string, error) {
-	driver, err := util.getPortworxDriver(p.plugin.host.GetHostName(), false) /*localOnly*/
+	driver, err := util.getPortworxDriver(util.host.GetHostName(), false)
 	if err != nil || driver == nil {
 		glog.Errorf("Failed to get portworx driver. Err: %v", err)
 		return "", 0, nil, err
@@ -86,7 +86,7 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 // DeleteVolume deletes a Portworx volume
 func (util *PortworxVolumeUtil) DeleteVolume(d *portworxVolumeDeleter) error {
-	driver, err := util.getPortworxDriver(d.plugin.host.GetHostName(), false)
+	driver, err := util.getPortworxDriver(util.host.GetHostName(), false)
 	if err != nil || driver == nil {
 		glog.Errorf("Failed to get portworx driver. Err: %v", err)
 		return err
@@ -111,7 +111,7 @@ func (util *PortworxVolumeUtil) AttachVolume(volumeID string, hostname types.Nod
 
 	devicePath, err := driver.Attach(volumeID)
 	if err != nil {
-		glog.Errorf("Error attaching Portworx Volume (%v): %v", m.volName, err)
+		glog.Errorf("Error attaching Portworx Volume (%v): %v", volumeID, err)
 		return "", err
 	}
 	return devicePath, nil
@@ -127,7 +127,7 @@ func (util *PortworxVolumeUtil) DetachVolume(volumeID string, hostname types.Nod
 
 	err = driver.Detach(volumeID)
 	if err != nil {
-		glog.Errorf("Error detaching Portworx Volume (%v): %v", u.volName, err)
+		glog.Errorf("Error detaching Portworx Volume (%v): %v", volumeID, err)
 		return err
 	}
 	return nil
@@ -143,7 +143,7 @@ func (util *PortworxVolumeUtil) MountVolume(volumeID string, mountPath string) e
 
 	err = driver.Mount(volumeID, mountPath)
 	if err != nil {
-		glog.Errorf("Error mounting Portworx Volume (%v) on Path (%v): %v", m.volName, mountPath, err)
+		glog.Errorf("Error mounting Portworx Volume (%v) on Path (%v): %v", volumeID, mountPath, err)
 		return err
 	}
 	return nil
@@ -159,14 +159,14 @@ func (util *PortworxVolumeUtil) UnmountVolume(volumeID string, mountPath string)
 
 	err = driver.Unmount(volumeID, mountPath)
 	if err != nil {
-		glog.Errorf("Error unmounting Portworx Volume (%v) on Path (%v): %v", u.volName, mountPath, err)
+		glog.Errorf("Error unmounting Portworx Volume (%v) on Path (%v): %v", volumeID, mountPath, err)
 		return err
 	}
 	return nil
 }
 
 func (util *PortworxVolumeUtil) VolumeIsAttached(volumeID string, hostname types.NodeName) (bool, error) {
-	driver, err := util.getPortworxDriver(string(hostname))
+	driver, err := util.getPortworxDriver(string(hostname), true)
 	if err != nil || driver == nil {
 		glog.Errorf("Failed to get portworx driver. Err: %v", err)
 		return false, err
@@ -223,14 +223,14 @@ func (util *PortworxVolumeUtil) VolumesAreAttached(volumeIDsByNode map[types.Nod
 //            Operations like create and delete volume don't need to be restricted to local volume host since
 //            any node in the Portworx cluster can co-ordinate the create/delete request and forward the operations to
 //            the Portworx node that will own/owns the data.
-func (util *PortworxVolumeUtil) getPortworxDriver(hostName, localOnly bool) (volumeapi.VolumeDriver, error) {
+func (util *PortworxVolumeUtil) getPortworxDriver(hostName string, localOnly bool) (volumeapi.VolumeDriver, error) {
 	var err error
 	if localOnly {
 		util.portworxClient, err = createDriverClient(hostName)
 		if err != nil {
 			return nil, err
 		} else {
-			glog.V(4).Infof("Using portworx local service at: %v as api endpoint", hostname)
+			glog.V(4).Infof("Using portworx local service at: %v as api endpoint", hostName)
 			return volumeclient.VolumeDriver(util.portworxClient), nil
 		}
 	}
