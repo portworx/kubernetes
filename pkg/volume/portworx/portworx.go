@@ -19,6 +19,9 @@ package portworx
 import (
 	"fmt"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
@@ -94,7 +98,7 @@ func (plugin *portworxVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _
 	return plugin.newMounterInternal(spec, pod.UID, plugin.util, plugin.host.GetMounter())
 }
 
-func (plugin *portworxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager portworxManager, mounter mount.Interface) (volume.Mounter, error) {
+func (plugin *portworxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager PortworxManager, mounter mount.Interface) (volume.Mounter, error) {
 	pwx, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -122,7 +126,7 @@ func (plugin *portworxVolumePlugin) NewUnmounter(volName string, podUID types.UI
 	return plugin.newUnmounterInternal(volName, podUID, plugin.util, plugin.host.GetMounter())
 }
 
-func (plugin *portworxVolumePlugin) newUnmounterInternal(volName string, podUID types.UID, manager portworxManager,
+func (plugin *portworxVolumePlugin) newUnmounterInternal(volName string, podUID types.UID, manager PortworxManager,
 	mounter mount.Interface) (volume.Unmounter, error) {
 	return &portworxVolumeUnmounter{
 		&portworxVolume{
@@ -139,7 +143,7 @@ func (plugin *portworxVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Delete
 	return plugin.newDeleterInternal(spec, plugin.util)
 }
 
-func (plugin *portworxVolumePlugin) newDeleterInternal(spec *volume.Spec, manager portworxManager) (volume.Deleter, error) {
+func (plugin *portworxVolumePlugin) newDeleterInternal(spec *volume.Spec, manager PortworxManager) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.PortworxVolume == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.PortworxVolume is nil")
 	}
@@ -157,7 +161,7 @@ func (plugin *portworxVolumePlugin) NewProvisioner(options volume.VolumeOptions)
 	return plugin.newProvisionerInternal(options, plugin.util)
 }
 
-func (plugin *portworxVolumePlugin) newProvisionerInternal(options volume.VolumeOptions, manager portworxManager) (volume.Provisioner, error) {
+func (plugin *portworxVolumePlugin) newProvisionerInternal(options volume.VolumeOptions, manager PortworxManager) (volume.Provisioner, error) {
 	return &portworxVolumeProvisioner{
 		portworxVolume: &portworxVolume{
 			manager: manager,
@@ -200,19 +204,23 @@ func getVolumeSource(
 }
 
 // Abstract interface to PD operations.
-type portworxManager interface {
+type PortworxManager interface {
 	// Creates a volume
 	CreateVolume(provisioner *portworxVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *portworxVolumeDeleter) error
 	// Attach a volume
-	AttachVolume(mounter *portworxVolumeMounter) (string, error)
+	AttachVolume(volumeID string, nodeName types.NodeName) (string, error)
 	// Detach a volume
-	DetachVolume(unmounter *portworxVolumeUnmounter) error
+	DetachVolume(volumeID string, nodeName types.NodeName) error
 	// Mount a volume
-	MountVolume(mounter *portworxVolumeMounter, mountDir string) error
+	MountVolume(volumeID string, mountDir string) error
 	// Unmount a volume
-	UnmountVolume(unmounter *portworxVolumeUnmounter, mountDir string) error
+	UnmountVolume(volumeID string, mountDir string) error
+	// Check if the volume is already attached to the node with the specified NodeName
+	VolumeIsAttached(volumeID string, nodeName types.NodeName) (bool, error)
+	// Check if disks specified in argument map are still attached to their respective nodes.
+	VolumesAreAttached(volumeIDsByNode map[types.NodeName][]string) (map[types.NodeName]map[string]bool, error)
 }
 
 // portworxVolume volumes are portworx block devices
@@ -223,7 +231,7 @@ type portworxVolume struct {
 	// Unique id of the PD, used to find the disk resource in the provider.
 	volumeID string
 	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager portworxManager
+	manager PortworxManager
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	plugin  *portworxVolumePlugin
@@ -275,21 +283,43 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return nil
 	}
 
-	if _, err := b.manager.AttachVolume(b); err != nil {
-		return err
-	}
-
-	glog.V(4).Infof("Portworx Volume %s attached", b.volumeID)
+	globalPDPath := makeGlobalVolumePath(b.plugin.host, b.volumeID)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return err
 	}
 
-	if err := b.manager.MountVolume(b, dir); err != nil {
-		return err
+	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
+	options := []string{"bind"}
+	if b.readOnly {
+		options = append(options, "ro")
 	}
-	if !b.readOnly {
-		volume.SetVolumeOwnership(b, fsGroup)
+	err = b.mounter.Mount(globalPDPath, dir, "", options)
+	if err != nil {
+		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
+		if mntErr != nil {
+			glog.Errorf("IsLikelyNotMountPoint check failed for %s: %v", dir, mntErr)
+			return err
+		}
+		if !notMnt {
+			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
+				glog.Errorf("failed to unmount %s: %v", dir, mntErr)
+				return err
+			}
+			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
+			if mntErr != nil {
+				glog.Errorf("IsLikelyNotMountPoint check failed for %s: %v", dir, mntErr)
+				return err
+			}
+			if !notMnt {
+				// This is very odd, we don't expect it.  We'll try again next sync loop.
+				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				return err
+			}
+		}
+		os.Remove(dir)
+		glog.Errorf("Mount of disk %s failed: %v", dir, err)
+		return err
 	}
 	glog.Infof("Portworx Volume %s setup at %s", b.volumeID, dir)
 	return nil
@@ -314,18 +344,8 @@ func (c *portworxVolumeUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *portworxVolumeUnmounter) TearDownAt(dir string) error {
-	glog.Infof("Portworx Volume TearDown of %s", dir)
-
-	if err := c.manager.UnmountVolume(c, dir); err != nil {
-		return err
-	}
-
-	// Call Portworx Detach Volume.
-	if err := c.manager.DetachVolume(c); err != nil {
-		return err
-	}
-
-	return nil
+	glog.V(4).Infof("Portworx Volume TearDown of %s", dir)
+	return util.UnmountPath(dir, c.mounter)
 }
 
 type portworxVolumeDeleter struct {
@@ -396,4 +416,31 @@ func (c *portworxVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 
 	return pv, nil
+}
+
+func makeGlobalVolumePath(host volume.VolumeHost, name string) string {
+	// Clean up the URI to be more fs-friendly
+	name = strings.Replace(name, "://", "/", -1)
+	return path.Join(host.GetPluginDir(portworxVolumePluginName), mount.MountsInGlobalPDPath, name)
+}
+
+// Reverses the mapping done in makeGlobalPDPath
+func getVolumeIDFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
+	basePath := path.Join(host.GetPluginDir(portworxVolumePluginName), mount.MountsInGlobalPDPath)
+	rel, err := filepath.Rel(basePath, globalPath)
+	if err != nil {
+		glog.Errorf("Failed to get volume id from global mount %s - %v", globalPath, err)
+		return "", err
+	}
+	if strings.Contains(rel, "../") {
+		glog.Errorf("Unexpected mount path: %s", globalPath)
+		return "", fmt.Errorf("unexpected mount path: " + globalPath)
+	}
+	// Reverse the :// replacement done in makeGlobalPDPath
+	volumeID := rel
+	if strings.HasPrefix(volumeID, "aws/") {
+		volumeID = strings.Replace(volumeID, "aws/", "aws://", 1)
+	}
+	glog.V(2).Info("Mapping mount dir ", globalPath, " to volumeID ", volumeID)
+	return volumeID, nil
 }
